@@ -4,7 +4,6 @@
 package mempress
 
 import Chisel._
-import chisel3.util.{HasBlackBoxResource}
 import freechips.rocketchip.tile._
 import freechips.rocketchip.config._
 import freechips.rocketchip.diplomacy._
@@ -25,7 +24,9 @@ class WrapBundle(nPTWPorts: Int)(implicit p: Parameters) extends Bundle {
 
 class MemPress(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyRoCC(
     opcodes = opcodes, nPTWPorts = if (p(MemPressTLB).isDefined) 1 else 0) {
+
   override lazy val module = new MemPressImp(this)
+
   val dmemOpt = p(MemPressTLB).map { _ =>
     val dmem = LazyModule(new DmemModule)
     tlNode := dmem.node
@@ -36,20 +37,15 @@ class MemPress(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyRoCC(
 class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModuleImp(outer) {
   chisel3.dontTouch(io)
 
-  io.resp.valid := Bool(false) 
-
   val ctrl = Module(new CtrlModule)
   ctrl.io.rocc_in <> io.cmd
+  io.resp <> ctrl.io.rocc_out
 
-// ctrl.io.rocc_req_val   <> io.cmd.valid
-// io.cmd.ready := ctrl.io.rocc_req_rdy
-// ctrl.io.rocc_funct     <> io.cmd.bits.inst.funct
-// ctrl.io.rocc_rs1       <> io.cmd.bits.rs1
-// ctrl.io.rocc_rs2       <> io.cmd.bits.rs2
-// ctrl.io.rocc_rd        <> io.cmd.bits.inst.rd
-// io.busy := ctrl.io.busy
+  io.cmd.ready := ctrl.io.rocc_in.ready
+  io.busy := ctrl.io.busy
+  io.interrupt := false.B
 
-  val status = RegEnable(io.cmd.bits.status, io.cmd.fire())
+  val status = RegEnable(io.cmd.bits.status, io.cmd.fire)
   val dmem_data = Wire(Bits())
   def dmem_ctrl(req: DecoupledIO[HellaCacheReq]) {
     req.valid := ctrl.io.dmem_req_val
@@ -73,10 +69,15 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
       io.ptw.head <> dmem.io.ptw
 
       dmem.io.status := status
-      dmem.io.sfence := ctrl.io.sfence
+// dmem.io.sfence := ctrl.io.sfence
+      dmem.io.sfence := false.B
     }
     case None => dmem_ctrl(io.mem.req)
   }
+
+  ctrl.io.dmem_resp_val <> io.mem.resp.valid
+  ctrl.io.dmem_resp_tag <> io.mem.resp.bits.tag
+  ctrl.io.dmem_resp_data := io.mem.resp.bits.data
 
 // ctrl.io.dmem_resp_val  <> io.mem.resp.valid
 // ctrl.io.dmem_resp_tag  <> io.mem.resp.bits.tag
@@ -85,7 +86,7 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
 // val dpath = Module(new DpathModule(W,S)(p))
 
 // dpath.io.message_in <> ctrl.io.buffer_out
-// dmem_data := dpath.io.hash_out(ctrl.io.windex)
+   dmem_data := 0.U
 
   //ctrl.io <> dpath.io
 // dpath.io.absorb := ctrl.io.absorb
@@ -97,12 +98,6 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
 }
 
 class WithMemPress extends Config ((site, here, up) => {
-// case Sha3WidthP => 64
-// case Sha3Stages => 1
-// case Sha3FastMem => true
-// case Sha3BufferSram => false
-// case Sha3Keccak => false
-// case Sha3BlackBox => false
   case MemPressTLB => Some(TLBConfig(nSets = 1, nWays = 4, nSectors = 1, nSuperpageEntries = 1))
   case BuildRoCC => up(BuildRoCC) ++ Seq(
     (p: Parameters) => {
