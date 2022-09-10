@@ -1,0 +1,15 @@
+{
+  "name" : "mempress-linux-jtr",
+  "base" : "mempress-linux.yaml",
+  "workdir" : "..",
+  "distro" : {
+    "name": "br",
+    "opts": {
+      "configs" : [ "jtr/buildroot-config" ],
+      "environment" : {
+        "BR2_EXTERNAL": "${mempress_LINUX_JTR_PATH}/jtr/buildroot-external"
+      }
+    }
+  },
+  "overlay" : "jtr/overlay"
+}

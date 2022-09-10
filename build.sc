@@ -7,7 +7,7 @@ import scalalib._
 // support BSP
 import mill.bsp._
 
-object mempress_acc extends SbtModule { m =>
+object mempress extends SbtModule { m =>
   override def millSourcePath = os.pwd
   override def scalaVersion = "2.13.8"
   override def scalacOptions = Seq(

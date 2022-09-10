@@ -1,0 +1,9 @@
+{
+  "name" : "mempress-linux-jtr-test",
+  "base" : "mempress-linux-jtr.yaml",
+  "workdir" : "..",
+  "run" : "jtr/bench.sh",
+  "testing" : {
+    "refDir" : "test-reference/linux-jtr"
+  }
+}

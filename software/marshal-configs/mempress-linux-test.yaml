@@ -1,0 +1,9 @@
+{
+  "name" : "mempress-linux-test",
+  "base" : "mempress-linux.yaml",
+  "workdir" : "..",
+  "command" : "/root/mempress-rocc",
+  "testing" : {
+    "refDir" : "test-reference/linux"
+  }
+}
