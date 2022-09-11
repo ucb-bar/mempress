@@ -1,37 +1,54 @@
 //see LICENSE for license
 //authors: Joonho Whangbo
+
 package mempress
 
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tile._
+import freechips.rocketchip.rocket._
 import freechips.rocketchip.rocket.constants.MemoryOpConstants
 import freechips.rocketchip.config._
 
+class MemReqInternal()(implicit val p: Parameters) extends Bundle 
+    with HasCoreParameters 
+    with MemoryOpConstants {
+  val addr = UInt(coreMaxAddrBits.W)
+  val tag  = UInt(coreParams.dcacheReqTagBits.W)
+  val cmd  = UInt(M_SZ.W)
+  val size = UInt(log2Ceil(coreDataBytes + 1).W)
+  val data = UInt(64.W)
+}
+
 class CtrlModuleIO()(implicit val p: Parameters) extends Bundle
-  with HasCoreParameters 
-  with MemoryOpConstants {
+    with HasCoreParameters 
+    with MemoryOpConstants {
   val rocc_in = Flipped(Decoupled(new RoCCCommand))
   val rocc_out = Decoupled(new RoCCResponse)
   val busy = Output(Bool())
-// val sfence = Output(Bool())
-    val dmem_req_val      = Output(Bool())
-    val dmem_req_rdy      = Input(Bool())
-    val dmem_req_tag      = Output(Bits(coreParams.dcacheReqTagBits.W))
-    val dmem_req_addr     = Output(Bits(coreMaxAddrBits.W))
-    val dmem_req_cmd      = Output(Bits(M_SZ.W))
-    val dmem_req_size     = Output(Bits(log2Ceil(coreDataBytes + 1).W))
 
-    val dmem_resp_val     = Input(Bool())
-    val dmem_resp_tag     = Input(Bits(7.W))
-    val dmem_resp_data    = Input(Bits(64.W))
+  val dmem_req = Decoupled(new MemReqInternal)
+  val dmem_resp = Flipped(Valid(new HellaCacheResp))
+
+// val sfence = Output(Bool())
+// val dmem_req_val      = Output(Bool())
+// val dmem_req_rdy      = Input(Bool())
+// val dmem_req_addr     = Output(Bits(coreMaxAddrBits.W))
+// val dmem_req_tag      = Output(Bits(coreParams.dcacheReqTagBits.W))
+// val dmem_req_cmd      = Output(Bits(M_SZ.W))
+// val dmem_req_size     = Output(Bits(log2Ceil(coreDataBytes + 1).W))
+
+// val dmem_resp_val     = Input(Bool())
+// val dmem_resp_tag     = Input(Bits(7.W))
+// val dmem_resp_data    = Input(Bits(64.W))
 }
 
-class CtrlModule(val max_streams: Int)(implicit val p: Parameters) extends Module
+class CtrlModule()(implicit val p: Parameters) extends Module
     with HasCoreParameters 
     with MemoryOpConstants {
-
   val io = IO(new CtrlModuleIO)
+
+  val max_streams = p(MemPressMaxStreams)
 
   val ctrl_idle :: ctrl_getinst :: ctrl_access :: ctrl_accesspend :: Nil = Enum(4)
   val ctrl_state = RegInit(ctrl_idle.asUInt)
@@ -53,14 +70,15 @@ class CtrlModule(val max_streams: Int)(implicit val p: Parameters) extends Modul
   val stride         = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
   val start_addr     = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
 
-  val dmem_resp_val_reg = RegNext(io.dmem_resp_val)
-  val dmem_resp_tag_reg = RegNext(io.dmem_resp_tag)
+  val dmem_resp_val_reg = RegNext(io.dmem_resp.valid)
+  val dmem_resp_tag_reg = RegNext(io.dmem_resp.bits.tag)
 
-  io.dmem_req_val := false.B
-  io.dmem_req_tag := 0.U
-  io.dmem_req_addr := 0.U
-  io.dmem_req_cmd := M_XWR
-  io.dmem_req_size := 0.U
+  io.dmem_req.valid := false.B
+  io.dmem_req.bits.addr := 0.U
+  io.dmem_req.bits.tag := 0.U
+  io.dmem_req.bits.cmd := M_XWR
+  io.dmem_req.bits.size := 0.U
+  io.dmem_req.bits.data := 0.U
 
   io.rocc_in.ready := !busy
 
@@ -100,20 +118,21 @@ class CtrlModule(val max_streams: Int)(implicit val p: Parameters) extends Modul
     is (ctrl_access.asUInt) {
       printf(p"ctrl_access state\n")
 
-      io.dmem_req_val := true.B
-      io.dmem_req_tag := 0.U
-      io.dmem_req_addr := start_addr(0.U) + stride(0.U)
-      io.dmem_req_cmd := M_XWR
-      io.dmem_req_size := log2Ceil(8).U
+      io.dmem_req.valid := true.B
+      io.dmem_req.bits.addr := start_addr(0.U) + stride(0.U)
+      io.dmem_req.bits.tag := 0.U
+      io.dmem_req.bits.cmd := M_XWR
+      io.dmem_req.bits.size := log2Ceil(8).U
+      io.dmem_req.bits.data := stride(0.U)
 
-      when (io.dmem_req_rdy) {
+      when (io.dmem_req.ready) {
         ctrl_state := ctrl_accesspend.asUInt
       }
     }
     is (ctrl_accesspend.asUInt) {
       printf(p"ctrl_accesspend state\n")
 
-      io.dmem_req_val := false.B
+      io.dmem_req.valid := false.B
 
       when (dmem_resp_val_reg) {
         busy := false.B
