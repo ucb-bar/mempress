@@ -45,20 +45,11 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
   io.interrupt := false.B
 
   val arb = Module(new MemArbiter)
-
   arb.io.req_in <> ctrl.io.dmem_req
-  arb.io.idx := 1.U
+  arb.io.idx := ctrl.io.dmem_req_idx
 
   val status = RegEnable(io.cmd.bits.status, io.cmd.fire)
   def dmem_ctrl(req: DecoupledIO[HellaCacheReq]) {
-// req.valid := ctrl.io.dmem_req.valid
-// ctrl.io.dmem_req.ready := req.ready
-// req <> ctrl.io.dmem_req
-// req.bits.addr := ctrl.io.dmem_req.bits.addr
-// req.bits.tag := ctrl.io.dmem_req.bits.tag
-// req.bits.cmd := ctrl.io.dmem_req.bits.cmd
-// req.bits.size := ctrl.io.dmem_req.bits.size
-// req.bits.data := ctrl.io.dmem_req.bits.data
     req <> arb.io.req_out
     req.bits.signed := false.B
     req.bits.dprv := status.dprv
@@ -78,7 +69,6 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
     }
     case None => dmem_ctrl(io.mem.req)
   }
-
 }
 
 class WithMemPress extends Config ((site, here, up) => {

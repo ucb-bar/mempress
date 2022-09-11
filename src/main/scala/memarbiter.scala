@@ -24,7 +24,6 @@ class MemArbiter()(implicit val p: Parameters) extends Module {
 
   val que_depth = p(MemPressReqQueDepth)
   val que = Seq.fill(max_streams)(Module(new Queue(new MemReqInternal, que_depth)))
-// val que_out = Vec(que.map{case q => q.io.deq})
 
   que.zipWithIndex.foreach { case(q, idx) =>
     q.io.enq <> io.req_in
