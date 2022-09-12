@@ -25,10 +25,14 @@ class MemArbiter()(implicit val p: Parameters) extends Module {
   val que_depth = p(MemPressReqQueDepth)
   val que = Seq.fill(max_streams)(Module(new Queue(new MemReqInternal, que_depth)))
 
+  io.req_in.ready := false.B
   que.zipWithIndex.foreach { case(q, idx) =>
-    q.io.enq <> io.req_in
+    q.io.enq.bits := io.req_in.bits
     when (idx.U =/= io.idx) {
       q.io.enq.valid := false.B
+    }.otherwise {
+      q.io.enq.valid := io.req_in.valid
+      io.req_in.ready := q.io.enq.ready
     }
   }
 
