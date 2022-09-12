@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <assert.h>
 #include "rocc.h"
 #include "compiler.h"
 #include "encoding.h"
@@ -14,11 +15,23 @@
 #include <sys/mman.h>
 #endif
  
-#define SHA3_256_DIGEST_SIZE 32
+#define MAX_ELEMS 4096
+#define MAX_STREAMS 4
+#define ALIGN_BYTES 1
+#define CL_BYTES 64
+
 
 int main() {
-
   unsigned long start, end;
+  int ii, jj;
+
+  int stream_cnt = 4;
+  int stream_type = 1; // 0 is read, otherwise write
+  int max_reqs = 13;
+  int stride_bytes;   // access stride in bytes
+  int stride_idx;
+
+  assert(stream_cnt <= MAX_STREAMS);
 
 #ifdef __linux
   // Ensure all pages are resident to avoid accelerator page faults
@@ -30,53 +43,40 @@ int main() {
 
   do {
     printf("Start basic test 1.\n");
-    // BASIC TEST 1 - 150 zero bytes
 
     // Setup some test data
-    static unsigned char input[150] __aligned(8) = { '\0' };
-    unsigned char output[SHA3_256_DIGEST_SIZE] __aligned(8);
+    static unsigned char input[MAX_STREAMS * MAX_ELEMS] __aligned(ALIGN_BYTES * 8) = {'\0'}; // __aligned(x) -> aligns x bits...?
 
     start = rdcycle();
 
-    // Compute hash with accelerator
     asm volatile ("fence");
-    // Invoke the acclerator and check responses
 
-    // setup accelerator with addresses of input and output
-    //              opcode rd rs1          rs2          funct
-    /* asm volatile ("custom2 x0, %[msg_addr], %[hash_addr], 0" : : [msg_addr]"r"(&input), [hash_addr]"r"(&output)); */
-    ROCC_INSTRUCTION_SS(2, &input, &output, 0);
+    ROCC_INSTRUCTION_SS(2, stream_cnt, stream_type, 0); // number of streams && rd or wr
+    ROCC_INSTRUCTION_S(2, max_reqs, 1);                 // max req per stream
+    for (ii = 0; ii < stream_cnt; ii++) {
+        stride_bytes = (ii + 1) * CL_BYTES;
+        stride_idx = stride_bytes / ALIGN_BYTES;
 
-    // Set length and compute hash
-    //              opcode rd rs1      rs2 funct
-    /* asm volatile ("custom2 x0, %[length], x0, 1" : : [length]"r"(ilen)); */
-/* ROCC_INSTRUCTION_S(2, sizeof(input), 1); */
+        ROCC_INSTRUCTION_SS(2, stride_bytes, &input[ii * MAX_ELEMS], 2); // stride in bytes, start address
+    }
+    assert(stream_cnt * CL_BYTES / ALIGN_BYTES * max_reqs <= MAX_ELEMS);
     asm volatile ("fence" ::: "memory");
 
     end = rdcycle();
 
-/* // Check result */
-    int i;
-    static const unsigned char result[SHA3_256_DIGEST_SIZE] =
-#ifdef KECCAK
-    {221,204,157,217,67,211,86,31,54,168,44,245,97,194,193,26,234,42,135,166,66,134,39,174,184,61,3,149,137,42,57,238};
-#else /* FIPS 202 */
-    {203,52,27,85,46,79,152,228,86,138,201,206,253,168,255,107,122,177,65,68,231,19,70,198,64,90,192,80,206,234,168,159};
-#endif
-    //sha3ONE(input, sizeof(input), result);
-    for(i = 0; i < SHA3_256_DIGEST_SIZE; i++){
-        printf("output[%d]:%d ==? results[%d]:%d \n",i,output[i],i,result[i]);
-        if(output[i] != result[i]) {
-            printf("Failed: Outputs don't match!\n");
-            printf("SHA execution took %lu cycles\n", end - start);
-            return 1;
+    for (ii = 0; ii < stream_cnt; ii++) {
+        stride_bytes = (ii + 1) * CL_BYTES;
+        stride_idx = stride_bytes / ALIGN_BYTES;
+
+        for (jj = 0; jj < max_reqs * stride_idx; jj += stride_idx) {
+            printf("input[%d][%d]: %d\n", ii, jj,
+                    input[ii * MAX_ELEMS + jj]);
         }
     }
   } while(0);
 
-  printf("Success!\n");
-
-  printf("SHA execution took %lu cycles\n", end - start);
+  printf("Execution Finished!\n");
+  printf("MemPress execution took %lu cycles\n", end - start);
 
   return 0;
 }
