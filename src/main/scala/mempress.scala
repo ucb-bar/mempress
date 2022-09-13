@@ -13,6 +13,7 @@ import freechips.rocketchip.rocket.{TLBConfig, HellaCacheReq}
 
 case object MemPressMaxStreams extends Field[Int]
 case object MemPressReqQueDepth extends Field[Int]
+case object MemPressTLDepth extends Field[Int]
 
 class WrapBundle(nPTWPorts: Int)(implicit p: Parameters) extends Bundle {
   val io = new RoCCIO(nPTWPorts)
@@ -75,6 +76,7 @@ class WithMemPress extends Config ((site, here, up) => {
   case MemPressTLB => Some(TLBConfig(nSets = 1, nWays = 4, nSectors = 1, nSuperpageEntries = 1))
   case MemPressMaxStreams => 4
   case MemPressReqQueDepth => 8
+  case MemPressTLDepth => 1023
   case BuildRoCC => up(BuildRoCC) ++ Seq(
     (p: Parameters) => {
       val mempress = LazyModule.apply(new MemPress(OpcodeSet.custom2)(p))

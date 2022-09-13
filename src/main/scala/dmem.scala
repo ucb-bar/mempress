@@ -15,8 +15,10 @@ case object MemPressTLB extends Field[Option[TLBConfig]](None)
 
 class DmemModule(implicit p: Parameters) extends LazyModule {
   lazy val module = new DmemModuleImp(this)
+
+  val max_outstanding_reqs = p(MemPressTLDepth)
   // FIXME: Unused Diplomacy node needed for conveying the physical address map to the TLB
-  val node = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLMasterParameters.v1("MEMPRESS")))))
+  val node = TLClientNode(Seq(TLMasterPortParameters.v1(Seq(TLMasterParameters.v1(name="MEMPRESS", sourceId=IdRange(0, max_outstanding_reqs))))))
 }
 
 class DmemModuleImp(outer: DmemModule)(implicit p: Parameters) extends LazyModuleImp(outer)
