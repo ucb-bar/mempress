@@ -9,38 +9,35 @@ import freechips.rocketchip.tile._
 import freechips.rocketchip.rocket._
 import freechips.rocketchip.rocket.constants.MemoryOpConstants
 import freechips.rocketchip.config._
+import freechips.rocketchip.util.DecoupledHelper
 
-class MemReqInternal()(implicit val p: Parameters) extends Bundle 
-    with HasCoreParameters 
-    with MemoryOpConstants {
-  val addr = UInt(coreMaxAddrBits.W)
-  val tag  = UInt(coreParams.dcacheReqTagBits.W)
-  val cmd  = UInt(M_SZ.W)
-  val size = UInt(log2Ceil(coreDataBytes + 1).W)
-  val data = UInt(64.W)
-}
+class CtrlModuleIO()(implicit val p: Parameters) extends Bundle {
+  val max_streams = p(MemPressMaxStreams)
 
-class CtrlModuleIO()(implicit val p: Parameters) extends Bundle
-    with HasCoreParameters 
-    with MemoryOpConstants {
   val rocc_in = Flipped(Decoupled(new RoCCCommand))
   val rocc_out = Decoupled(new RoCCResponse)
   val busy = Output(Bool())
 
-  val dmem_req = Decoupled(new MemReqInternal)
-  val dmem_req_idx = Output(UInt(log2Ceil(p(MemPressMaxStreams)).W))
-  val dmem_resp = Flipped(Valid(new HellaCacheResp))
+  val dmem_status_out = Valid(new RoCCCommand)
+  val sfence_out = Output(Bool())
+
+  val dmem_req = Decoupled(new L2ReqInternal)
+  val dmem_req_idx = Output(UInt(log2Ceil(max_streams).W))
+  val dmem_resp = Vec(max_streams, Flipped(Decoupled(new L2RespInternal)))
 }
 
 class CtrlModule()(implicit val p: Parameters) extends Module
     with HasCoreParameters 
     with MemoryOpConstants {
-  val io = IO(new CtrlModuleIO)
 
-  printf(s"${coreParams.dcacheReqTagBits}")
+  val FUNCT_GET_STREAM_CNT_AND_TYPE = 0.U
+  val FUNCT_GET_MAXREQS = 1.U
+  val FUNCT_PARSE_STREAM_INFO = 2.U
+  val FUNCT_SFENCE = 3.U
 
   val max_streams = p(MemPressMaxStreams)
-  println(s"p(MemPressMaxStreams) : ${max_streams}")
+
+  val io = IO(new CtrlModuleIO)
 
   val ctrl_idle :: ctrl_getinst :: ctrl_access :: ctrl_accesspend :: Nil = Enum(4)
   val ctrl_state = RegInit(ctrl_idle.asUInt)
@@ -53,6 +50,13 @@ class CtrlModule()(implicit val p: Parameters) extends Module
   val busy = RegInit(false.B)
   io.busy := busy
 
+  val sfence_fire = DecoupledHelper(io.rocc_in.valid,
+                                    io.rocc_in.bits.inst.funct === FUNCT_SFENCE)
+  io.sfence_out := sfence_fire.fire
+
+  io.dmem_status_out.bits <> io.rocc_in.bits
+  io.dmem_status_out.valid := io.rocc_in.fire
+
   val stream_rd :: stream_wr :: Nil = Enum(2)
 
   val stream_cnt     = RegInit(0.U(log2Ceil(max_streams + 1).W))   // number of streams
@@ -62,8 +66,8 @@ class CtrlModule()(implicit val p: Parameters) extends Module
   val stride         = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W)))) // bytes to skip
   val start_addr     = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
 
-  val dmem_resp_val_reg = RegNext(io.dmem_resp.valid)
-  val dmem_resp_tag_reg = RegNext(io.dmem_resp.bits.tag)
+  val dmem_resp_val_reg = (0 until max_streams).map{ i => RegNext(io.dmem_resp(i).valid) }
+  io.dmem_resp.foreach(_.ready := true.B)
 
   val s_idx       = RegInit(0.U(log2Ceil(max_streams + 1).W))
   val s_sent      = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
@@ -74,7 +78,6 @@ class CtrlModule()(implicit val p: Parameters) extends Module
   io.dmem_req_idx := s_idx
   io.dmem_req.valid := false.B
   io.dmem_req.bits.addr := 0.U
-  io.dmem_req.bits.tag := 0.U
   io.dmem_req.bits.cmd := M_XWR
   io.dmem_req.bits.size := 0.U
   io.dmem_req.bits.data := 0.U
@@ -83,10 +86,8 @@ class CtrlModule()(implicit val p: Parameters) extends Module
 
   switch (ctrl_state) {
     is (ctrl_idle.asUInt) {
-      printf(p"ctrl_idle state\n")
-
       when (io.rocc_in.fire) {
-        when (io.rocc_in.bits.inst.funct === 0.U) {
+        when (io.rocc_in.bits.inst.funct === FUNCT_GET_STREAM_CNT_AND_TYPE) {
           stream_cnt := io.rocc_in.bits.rs1
 
           when (io.rocc_in.bits.rs2 === 0.U) {
@@ -96,35 +97,34 @@ class CtrlModule()(implicit val p: Parameters) extends Module
           }
 
           assert(stream_cnt < max_streams.U)
-          printf(p"stream_cnt: ${io.rocc_in.bits.rs1} stream_type ${io.rocc_in.bits.rs2}\n")
-        }.elsewhen (io.rocc_in.bits.inst.funct === 1.U) {
+
+          MemPressLogger.logInfo("ROCC_GET_STREAM_CNT_AND_TYPE: stream_cnt = %d, stream_type = %d\n",
+            io.rocc_in.bits.rs1, io.rocc_in.bits.rs2)
+        }.elsewhen (io.rocc_in.bits.inst.funct === FUNCT_GET_MAXREQS) {
           max_reqs := io.rocc_in.bits.rs1
-          printf(p"max_reqs: ${io.rocc_in.bits.rs1}\n")
-// assert(((io.rocc_in.bits.rs1 & (io.rocc_in.bits.rs1 - 1.U)) === 0.U))
-        }.elsewhen (io.rocc_in.bits.inst.funct === 2.U) {
+          MemPressLogger.logInfo("ROCC_GET_MAXREQS: max_reqs = %d\n", io.rocc_in.bits.rs1)
+        }.elsewhen (io.rocc_in.bits.inst.funct === FUNCT_PARSE_STREAM_INFO) {
           rec_stream_cnt := rec_stream_cnt + 1.U
 
           stride(rec_stream_cnt)     := io.rocc_in.bits.rs1
-          start_addr(rec_stream_cnt) := io.rocc_in.bits.rs2
+          start_addr(rec_stream_cnt) := (io.rocc_in.bits.rs2 >> 4.U) << 4.U // align address to 16bytes
 
           when (rec_stream_cnt === stream_cnt - 1.U) {
             busy := true.B
             ctrl_state := ctrl_access.asUInt
           }
-          printf(p"stride: ${io.rocc_in.bits.rs1} start_addr: ${io.rocc_in.bits.rs2}\n")
+          MemPressLogger.logInfo("ROCC_PARSE_STREAM_INFO: stride = %d, start_addr = 0x%x\n", 
+            io.rocc_in.bits.rs1, io.rocc_in.bits.rs2)
         }
       }
     }
     is (ctrl_access.asUInt) {
       val addr = start_addr(s_idx) + stride(s_idx) * s_sent(s_idx)
-      val data = stride(s_idx) - 1.U
-      printf(p"ctrl_access state dmem_req.fire: ${io.dmem_req.fire} s_idx: ${s_idx} s_sent: ${s_sent(s_idx)} s_rec: ${s_rec(s_idx)} addr: ${addr} data: ${data}\n")
-
+      val data = stride(s_idx)
       io.dmem_req.valid     := !s_sent_done(s_idx)
       io.dmem_req.bits.addr := addr
-      io.dmem_req.bits.tag  := s_idx
       io.dmem_req.bits.cmd  := Mux(stream_type === stream_rd.asUInt, M_XRD, M_XWR)
-      io.dmem_req.bits.size := log2Ceil(1024).U // FIXME
+      io.dmem_req.bits.size := log2Ceil(16).U // FIXME
       io.dmem_req.bits.data := data
 
       when (s_sent_done(s_idx)) {
@@ -137,16 +137,9 @@ class CtrlModule()(implicit val p: Parameters) extends Module
         }
       }
 
-      when (dmem_resp_val_reg) {
-        val s_rec_idx = dmem_resp_tag_reg
-        s_rec(s_rec_idx) := s_rec(s_rec_idx) + 1.U
-        printf(p"tag: ${dmem_resp_tag_reg} s_rec_idx: ${s_rec_idx} s_rec: ${s_rec}\n")
+      check_resp()
 
-        when (s_rec(s_rec_idx) === max_reqs - 1.U) {
-          s_rec_done(s_rec_idx) := true.B
-        }
-      }
-
+      // TODO : make this into a function
       val sent_done = s_sent_done.zipWithIndex.map { case(s, idx) =>
         val x = WireInit(true.B)
         when (idx.U < stream_cnt) {
@@ -158,23 +151,17 @@ class CtrlModule()(implicit val p: Parameters) extends Module
       when (sent_done.reduce(_ && _)) {
         ctrl_state := ctrl_accesspend.asUInt
       }
+
+      MemPressLogger.logInfo("CTRL_ACCESS state, dmem_req.fire = %d, s_idx = %d, s_sent = %d, addr = 0x%x, data = %d\n",
+        io.dmem_req.fire, s_idx, s_sent(s_idx), addr, data)
     }
     is (ctrl_accesspend.asUInt) {
-      printf(p"ctrl_accesspend state\n")
-
       io.dmem_req.valid := false.B
 
-      when (dmem_resp_val_reg) {
-        val s_rec_idx = dmem_resp_tag_reg
-        s_rec(s_rec_idx) := s_rec(s_rec_idx) + 1.U
-        printf(p"tag: ${dmem_resp_tag_reg} s_rec_idx: ${s_rec_idx} s_rec: ${s_rec} OHToUInt(max_reqs): ${OHToUInt(max_reqs)}\n")
+      check_resp()
 
-        when (s_rec(s_rec_idx) === max_reqs - 1.U) {
-          s_rec_done(s_rec_idx) := true.B
-        }
-      }
-
-      // FIXME
+      // TODO : make this into a function
+      printf(p"${s_rec_done}\n")
       val rec_done = s_rec_done.zipWithIndex.map { case(r, idx) =>
         val x = WireInit(true.B)
         when (idx.U < stream_cnt) {
@@ -196,5 +183,16 @@ class CtrlModule()(implicit val p: Parameters) extends Module
     }
   }
 
-  printf(p"$busy")
+  def check_resp() {
+    for (i <- 0 until max_streams) {
+      when (dmem_resp_val_reg(i)) {
+        val idx = i.U
+        s_rec(idx) := s_rec(idx) + 1.U
+
+        when (s_rec(idx) === max_reqs - 1.U) {
+          s_rec_done(idx) := true.B
+        }
+      }
+    }
+  }
 }

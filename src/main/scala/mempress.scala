@@ -12,71 +12,75 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.rocket.{TLBConfig, HellaCacheReq}
 
 case object MemPressMaxStreams extends Field[Int]
-case object MemPressReqQueDepth extends Field[Int]
+case object MemPressArbQueDepth extends Field[Int]
 case object MemPressTLDepth extends Field[Int]
-
-class WrapBundle(nPTWPorts: Int)(implicit p: Parameters) extends Bundle {
-  val io = new RoCCIO(nPTWPorts)
-  val clock = Input(Clock())
-  val reset = Input(UInt(1.W))
-}
+case object MemPressMaxOutstandingReqs extends Field[Int]
+case object MemPressPrintfEnable extends Field[Boolean](false)
 
 class MemPress(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyRoCC(
-    opcodes = opcodes, nPTWPorts = if (p(MemPressTLB).isDefined) 1 else 0) {
+    opcodes = opcodes, nPTWPorts = if (p(MemPressTLB).isDefined) p(MemPressMaxStreams) else 0) {
 
   override lazy val module = new MemPressImp(this)
 
-  val dmemOpt = p(MemPressTLB).map { _ =>
-    val dmem = LazyModule(new DmemModule)
-    tlNode := dmem.node
-    dmem
+  val max_streams = p(MemPressMaxStreams)
+  val max_outstand_reqs = p(MemPressMaxOutstandingReqs)
+  val l2helper = (0 until max_streams).map{ x =>
+    val y = LazyModule(new L2MemHelper(s"stream[${x}]", 
+                                       numOutstandingReqs=max_outstand_reqs, 
+                                       queueResponses=true, 
+                                       queueRequests=true)) 
+    tlNode := y.masterNode
+    y
   }
 }
 
 class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModuleImp(outer) {
   chisel3.dontTouch(io)
 
-  val ctrl = Module(new CtrlModule)
+  val max_streams = p(MemPressMaxStreams)
+
+  // tie up some wires
+  io.mem.req.valid := false.B
+  io.mem.s1_kill := false.B
+  io.mem.s2_kill := false.B
+  io.mem.keep_clock_enabled := true.B
+  io.interrupt := false.B
+
+  val ctrl = Module(new CtrlModule())
   ctrl.io.rocc_in <> io.cmd
   io.resp <> ctrl.io.rocc_out
-  ctrl.io.dmem_resp <> io.mem.resp
-
   io.cmd.ready := ctrl.io.rocc_in.ready
   io.busy := ctrl.io.busy
-  io.interrupt := false.B
 
   val arb = Module(new MemArbiter)
   arb.io.req_in <> ctrl.io.dmem_req
   arb.io.idx := ctrl.io.dmem_req_idx
 
   val status = RegEnable(io.cmd.bits.status, io.cmd.fire)
-  def dmem_ctrl(req: DecoupledIO[HellaCacheReq]) {
-    req <> arb.io.req_out
-    req.bits.signed := false.B
-    req.bits.dprv := status.dprv
-    req.bits.dv := status.dv
-    req.bits.phys := false.B
-  }
 
-  outer.dmemOpt match {
-    case Some(m) => {
-      val dmem = m.module
-      dmem_ctrl(dmem.io.req)
-      io.mem.req <> dmem.io.mem
-      io.ptw.head <> dmem.io.ptw
-
-      dmem.io.status := status
-      dmem.io.sfence := false.B
+  arb.io.req_out.ready := false.B
+  for (i <- 0 until max_streams) {
+    when (i.U === arb.io.chosen) {
+      outer.l2helper(i).module.io.userif.req.valid := arb.io.req_out.valid
+      arb.io.req_out.ready := outer.l2helper(i).module.io.userif.req.ready
+    }.otherwise {
+      outer.l2helper(i).module.io.userif.req.valid := false.B
     }
-    case None => dmem_ctrl(io.mem.req)
+    ctrl.io.dmem_resp(i) <> outer.l2helper(i).module.io.userif.resp
+    outer.l2helper(i).module.io.userif.req.bits := arb.io.req_out.bits
+    outer.l2helper(i).module.io.sfence <> ctrl.io.sfence_out
+    outer.l2helper(i).module.io.status.valid := ctrl.io.dmem_status_out.valid
+    outer.l2helper(i).module.io.status.bits := ctrl.io.dmem_status_out.bits.status
+    io.ptw(i) <> outer.l2helper(i).module.io.ptw
   }
 }
 
 class WithMemPress extends Config ((site, here, up) => {
   case MemPressTLB => Some(TLBConfig(nSets = 1, nWays = 4, nSectors = 1, nSuperpageEntries = 1))
   case MemPressMaxStreams => 4
-  case MemPressReqQueDepth => 8
-  case MemPressTLDepth => 1023
+  case MemPressArbQueDepth => 8
+  case MemPressMaxOutstandingReqs => 8
+  case MemPressPrintfEnable => false
   case BuildRoCC => up(BuildRoCC) ++ Seq(
     (p: Parameters) => {
       val mempress = LazyModule.apply(new MemPress(OpcodeSet.custom2)(p))
