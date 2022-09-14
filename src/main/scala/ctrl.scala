@@ -106,26 +106,31 @@ class CtrlModule()(implicit val p: Parameters) extends Module
         }.elsewhen (io.rocc_in.bits.inst.funct === FUNCT_PARSE_STREAM_INFO) {
           rec_stream_cnt := rec_stream_cnt + 1.U
 
+          val start_addr_align = (io.rocc_in.bits.rs2 >> 4.U) << 4.U
           stride(rec_stream_cnt)     := io.rocc_in.bits.rs1
-          start_addr(rec_stream_cnt) := (io.rocc_in.bits.rs2 >> 4.U) << 4.U // align address to 16bytes
+          start_addr(rec_stream_cnt) := start_addr_align
 
           when (rec_stream_cnt === stream_cnt - 1.U) {
             busy := true.B
             ctrl_state := ctrl_access.asUInt
           }
-          MemPressLogger.logInfo("ROCC_PARSE_STREAM_INFO: stride = %d, start_addr = 0x%x\n", 
-            io.rocc_in.bits.rs1, io.rocc_in.bits.rs2)
+          MemPressLogger.logInfo("ROCC_PARSE_STREAM_INFO: stride = %d, start_addr = 0x%x, start_addr_align = 0x%x\n", 
+            io.rocc_in.bits.rs1, io.rocc_in.bits.rs2, start_addr_align)
         }
       }
     }
     is (ctrl_access.asUInt) {
       val addr = start_addr(s_idx) + stride(s_idx) * s_sent(s_idx)
-      val data = stride(s_idx)
+      val data = ((1.U << 128.U) - 1.U) ^ (1.U << s_idx)
+
       io.dmem_req.valid     := !s_sent_done(s_idx)
       io.dmem_req.bits.addr := addr
       io.dmem_req.bits.cmd  := Mux(stream_type === stream_rd.asUInt, M_XRD, M_XWR)
       io.dmem_req.bits.size := log2Ceil(16).U // FIXME
       io.dmem_req.bits.data := data
+
+      MemPressLogger.logInfo("CTRL_ACCESS state, dmem_req.fire = %d, s_idx = %d, s_sent = %d, addr = 0x%x, data = 0x%x\n",
+        io.dmem_req.fire, s_idx, s_sent(s_idx), addr, data)
 
       when (s_sent_done(s_idx)) {
         s_idx := Mux(s_idx === stream_cnt - 1.U, 0.U, s_idx + 1.U)
@@ -139,37 +144,17 @@ class CtrlModule()(implicit val p: Parameters) extends Module
 
       check_resp()
 
-      // TODO : make this into a function
-      val sent_done = s_sent_done.zipWithIndex.map { case(s, idx) =>
-        val x = WireInit(true.B)
-        when (idx.U < stream_cnt) {
-          x := s
-        }
-        x
-      }
-
+      val sent_done = check_done(s_sent_done)
       when (sent_done.reduce(_ && _)) {
         ctrl_state := ctrl_accesspend.asUInt
       }
-
-      MemPressLogger.logInfo("CTRL_ACCESS state, dmem_req.fire = %d, s_idx = %d, s_sent = %d, addr = 0x%x, data = %d\n",
-        io.dmem_req.fire, s_idx, s_sent(s_idx), addr, data)
     }
     is (ctrl_accesspend.asUInt) {
       io.dmem_req.valid := false.B
 
       check_resp()
 
-      // TODO : make this into a function
-      printf(p"${s_rec_done}\n")
-      val rec_done = s_rec_done.zipWithIndex.map { case(r, idx) =>
-        val x = WireInit(true.B)
-        when (idx.U < stream_cnt) {
-          x := r
-        }
-        x
-      }
-
+      val rec_done = check_done(s_rec_done)
       when (rec_done.reduce(_ && _)) {
         busy := false.B
         ctrl_state := ctrl_idle.asUInt
@@ -181,6 +166,17 @@ class CtrlModule()(implicit val p: Parameters) extends Module
         s_rec_done.foreach(_ := false.B)
       }
     }
+  }
+
+  def check_done(regs : Vec[Bool]) = {
+    val done = regs.zipWithIndex.map { case(r, idx) =>
+      val x = WireInit(true.B)
+      when (idx.U < stream_cnt) {
+        x := r
+      }
+      x
+    }
+    done
   }
 
   def check_resp() {
