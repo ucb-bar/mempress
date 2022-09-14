@@ -15,7 +15,7 @@
 #include <sys/mman.h>
 #endif
  
-#define MAX_ELEMS 4096
+#define MAX_ELEMS 8192
 #define MAX_STREAMS 4
 #define ALIGN_BYTES 1
 #define CL_BYTES 64
@@ -23,11 +23,11 @@
 
 int main() {
   unsigned long start, end;
-  int ii, jj;
+  int ii, jj, kk;
 
   int stream_cnt = 4;
   int stream_type = 1; // 0 is read, otherwise write
-  int max_reqs = 13;
+  int max_reqs = 32;
   int stride_bytes;   // access stride in bytes
   int stride_idx;
 
@@ -69,8 +69,10 @@ int main() {
         stride_idx = stride_bytes / ALIGN_BYTES;
 
         for (jj = 0; jj < max_reqs * stride_idx; jj += stride_idx) {
-            printf("input[%d][%d]: %d\n", ii, jj,
-                    input[ii * MAX_ELEMS + jj]);
+            for (kk = 0; kk < 16; kk++) {
+                printf("input[%d][%d][%d]: %d ", ii, jj, kk, input[ii * MAX_ELEMS + jj + kk]);
+            }
+            printf("\n");
         }
     }
   } while(0);
