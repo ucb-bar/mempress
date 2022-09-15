@@ -1,1 +1,0 @@
-source "$BR2_EXTERNAL_RISCV_MEMPRESS_PATH/package/john/Config.in"

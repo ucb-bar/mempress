@@ -1,6 +1,0 @@
-{
-  "name" : "mempress-linux-jtr-crack",
-  "base" : "mempress-linux-jtr.yaml",
-  "workdir" : "..",
-  "run" : "jtr/crack.sh"
-}
