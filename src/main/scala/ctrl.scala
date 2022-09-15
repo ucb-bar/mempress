@@ -32,8 +32,8 @@ class CtrlModule()(implicit val p: Parameters) extends Module
     with MemoryOpConstants {
 
   val FUNCT_SFENCE = 0.U
-  val FUNCT_GET_STREAMCNT_MAXREQS = 1.U
-  val FUNCT_PARSE_STREAM_INFO = 2.U
+  val FUNCT_PARSE_GLOBAL_STREAM_INFO = 1.U
+  val FUNCT_PARSE_LOCAL_STREAM_INFO = 2.U
   val FUNCT_GET_CYCLE = 3.U
   val FUNCT_GET_REQCNT = 4.U
 
@@ -70,9 +70,12 @@ class CtrlModule()(implicit val p: Parameters) extends Module
   val stream_cnt     = RegInit(0.U(log2Ceil(max_streams + 1).W))   // number of streams
   val rec_stream_cnt = RegInit(0.U(log2Ceil(max_streams + 1).W))   // streams received
   val max_reqs       = RegInit(0.U(64.W))                          // max reqs sent per stream
+  val addr_range     = RegInit(0.U(64.W))
   val stream_type    = RegInit(VecInit(Seq.fill(max_streams)(stride_rd.asUInt)))
   val stride         = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W)))) // bytes to skip
   val start_addr     = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
+  val end_addr       = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
+  val cur_addr       = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
 
   val dmem_resp_val_reg  = (0 until max_streams).map{ i => RegNext(io.dmem_resp(i).valid) }
   val dmem_resp_data_reg = (0 until max_streams).map{ i => RegNext(io.dmem_resp(i).bits.data) }
@@ -100,30 +103,34 @@ class CtrlModule()(implicit val p: Parameters) extends Module
         val rs1_val = io.rocc_in.bits.rs1
         val rs2_val = io.rocc_in.bits.rs2
 
-        when (funct === FUNCT_GET_STREAMCNT_MAXREQS) {
-          stream_cnt := rs1_val
+        when (funct === FUNCT_PARSE_GLOBAL_STREAM_INFO) {
+          stream_cnt := rs1_val(4, 0)
+          addr_range := rs1_val >> 5.U
           max_reqs := rs2_val
           assert(stream_cnt < max_streams.U)
 
           MemPressLogger.logInfo(
-            "ROCC_GET_STREAM_CNT_AND_MAXREQS: stream_cnt = %d, max_reqs = %d\n",
-            rs1_val, rs2_val)
-        } .elsewhen (funct === FUNCT_PARSE_STREAM_INFO) {
+            "ROCC_PARSE_GLOBAL_STREAM_INFO: stream_cnt = %d, max_reqs = %d addr_range: 0x%x\n",
+            rs1_val(4, 0), rs2_val, rs1_val >> 4.U)
+        } .elsewhen (funct === FUNCT_PARSE_LOCAL_STREAM_INFO) {
           rec_stream_cnt := rec_stream_cnt + 1.U
 
           val start_addr_align = (rs2_val >> 4.U) << 4.U
           val cur_stride = (rs1_val >> 3.U)
           val cur_stream_type = rs1_val(2, 0)
+
           stream_type(rec_stream_cnt) := cur_stream_type
           stride(rec_stream_cnt)      := cur_stride
           start_addr(rec_stream_cnt)  := start_addr_align
+          cur_addr(rec_stream_cnt)    := start_addr_align
+          end_addr(rec_stream_cnt)    := start_addr_align + addr_range
 
           when (rec_stream_cnt === stream_cnt - 1.U) {
             busy := true.B
             ctrl_state := ctrl_access.asUInt
           }
           MemPressLogger.logInfo(
-            "ROCC_PARSE_STREAM_INFO: stride: %d, start_addr: 0x%x, start_addr_align: 0x%x stream_type: %d\n", 
+            "ROCC_PARSE_LOCAL_STREAM_INFO: stride: %d, start_addr: 0x%x, start_addr_align: 0x%x stream_type: %d\n", 
             cur_stride, rs2_val, start_addr_align, cur_stream_type)
         }.elsewhen (funct === FUNCT_GET_CYCLE && !rocc_out_val) {
           rocc_out_val := true.B
@@ -148,14 +155,21 @@ class CtrlModule()(implicit val p: Parameters) extends Module
       val data = ((1.U << 128.U) - 1.U) ^ (1.U << s_idx)
 
       when (cur_stream === rand_rd.asUInt || cur_stream === rand_wr.asUInt) {
-        addr := start_addr(s_idx) + FibonacciLFSR.maxPeriod(log2Ceil(64 * max_streams)) << 4.U// FIXME : More elegant way?
+       // FIXME : more elegant?
+        addr := start_addr(s_idx) + FibonacciLFSR.maxPeriod(log2Ceil(max_streams)) << 4.U
       }.elsewhen (cur_stream === stride_rd.asUInt || cur_stream === stride_wr.asUInt) {
-        addr := start_addr(s_idx) + stride(s_idx) * s_sent(s_idx)
+        val nxt_addr = cur_addr(s_idx) + stride(s_idx)
+        when (nxt_addr >= end_addr(s_idx)) {
+          addr := start_addr(s_idx)
+        } .otherwise {
+          addr := nxt_addr
+        }
+        cur_addr(s_idx) := addr
       }.elsewhen (cur_stream === burst_rd.asUInt || cur_stream === burst_wr.asUInt) {
         // TODO : add burst stream implementation
         // - What is the difference btw burst vs sending requests that has consec addr?
         // - Just leave it as is for now
-        addr := start_addr(s_idx) + stride(s_idx) * s_sent(s_idx)
+        addr := start_addr(s_idx) + FibonacciLFSR.maxPeriod(log2Ceil(max_streams)) << 4.U
       }
 
       val cur_cmd = WireInit(0.U)
@@ -173,8 +187,8 @@ class CtrlModule()(implicit val p: Parameters) extends Module
 
       when (io.dmem_req.fire) {
         req_counter := req_counter + 1.U
-        MemPressLogger.logInfo("MemReq -> req.fire: %d, s_idx: %d, s_sent: %d, addr: 0x%x, data: 0x%x streamtype: %d\n",
-          io.dmem_req.fire, s_idx, s_sent(s_idx), addr, data, cur_stream)
+        MemPressLogger.logInfo("MemReq -> s_idx: %d, s_sent: %d, addr: 0x%x, data: 0x%x streamtype: %d\n",
+          s_idx, s_sent(s_idx), addr, data, cur_stream)
       }
 
       when (s_sent_done(s_idx)) {

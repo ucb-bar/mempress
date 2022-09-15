@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 #include <malloc.h>
 #include "rocc.h"
 #include "compiler.h"
@@ -18,7 +19,6 @@
 #endif
  
 #define MAX_STREAMS 16
-#define ALIGN_BYTES 1
 #define CL_BYTES 64
 
 enum STREAM_TYPE {
@@ -30,24 +30,27 @@ enum STREAM_TYPE {
     RAND_WR = 5
 };
 
-// can't we do argv argc
 int main() {
+  printf("main() started\n");
+
+  int max_reqs = 32;
+  int stream_cnt = 8;
+  assert(stream_cnt <= MAX_STREAMS);
+
   unsigned long cycle_cnt, req_sent;
   int ii, jj, kk;
+
+  int kB = 1024;
+  int l2_kB = 2048;
+  int addr_range = l2_kB * kB * 4;
+/* int addr_range = 2048; */
 
   int stride_bytes[MAX_STREAMS];
   int stride_idx[MAX_STREAMS];
   for (ii = 0; ii < MAX_STREAMS; ii++) {
-      stride_bytes[ii] = (ii + 1) * CL_BYTES;
+      stride_bytes[ii] = 2 * (ii + 1) * CL_BYTES;
       stride_idx[ii] = stride_bytes[ii] / (int)sizeof(char);
   }
-
-  int kB = 1024;
-  int l2_kB = 2048;
-  int max_reqs = l2_kB * kB / (CL_BYTES * 1); // stride 0 accesses 2MB range
-/* int max_reqs = l2_kB / stride_bytes[0]; // stream 0 accesses 2MB range */
-
-  int stream_cnt = 1;
 
   enum STREAM_TYPE stream_type[MAX_STREAMS];
   for (ii = 0; ii < MAX_STREAMS; ii++) {
@@ -56,22 +59,19 @@ int main() {
       else stream_type[ii] = STRIDE_WR;
   }
 
-  int mem_size = 0;
-  int addr_offset[MAX_STREAMS];
+  int mem_size = addr_range * stream_cnt;
   int idx_offset[MAX_STREAMS];
   for (ii = 0; ii < stream_cnt; ii++) {
-      addr_offset[ii] = mem_size;
-      idx_offset[ii] = addr_offset[ii] / (int)sizeof(char);
-      mem_size += (max_reqs * stride_bytes[ii]);
+      idx_offset[ii] = addr_range * ii / (int)sizeof(char);
   }
   int max_idx = mem_size / (int)sizeof(char);
 
-  assert(stream_cnt <= MAX_STREAMS);
+  printf("Start allocating memory by memalign\n");
   char* input = (char*)memalign(sizeof(char), (size_t)mem_size);
 
-  // initialize the input
-  // this touches all the data so that mempress will not incur page faults
-  for (ii = 0; ii < max_idx; ii++) {
+  printf("Prevents page faults by touching them\n");
+  int page_stride = 4 * kB / (int)sizeof(char);
+  for (ii = 0; ii < max_idx; ii += page_stride) {
       input[ii] = '3'; // 0011_0011
   }
 
@@ -89,10 +89,13 @@ int main() {
     // insert fence instruction
     asm volatile ("fence");
 
-    // number of streams && rd or wr
-    ROCC_INSTRUCTION_SS(2, stream_cnt, max_reqs, 1);
+    // number of streams && max request per stream
+    uint64_t stream_cnt_n_addr_range = (addr_range << 5) | (stream_cnt);
+    ROCC_INSTRUCTION_SS(2, stream_cnt_n_addr_range, max_reqs, 1);
     for (ii = 0; ii < stream_cnt; ii++) {
         uint64_t stride_n_type = (stride_bytes[ii] << 3) | ((int)stream_type[ii]);
+
+        //set per stream stride, type, starting addr
         ROCC_INSTRUCTION_SS(2, stride_n_type, &input[idx_offset[ii]], 2);
     }
 
@@ -104,7 +107,6 @@ int main() {
     asm volatile ("fence" ::: "memory");
 
     assert(cycle_cnt != 0);
-
     int bytes_sent = req_sent * 16;
     int nano_sec = cycle_cnt / 2; // assuming 2.0 GHz .... float support missing?
     int bw_MBps = (bytes_sent * 1000) / nano_sec;
@@ -112,17 +114,6 @@ int main() {
     printf("cycle_cnt value: %lu\n", cycle_cnt);
     printf("req_sent value: %lu\n", req_sent);
     printf("Achieved BW of the system: %d MB/s\n", bw_MBps);
-
-/* for (ii = 0; ii < stream_cnt; ii++) { */
-/* for (jj = 0; jj < max_reqs; jj++) { */
-/* for (kk = 0; kk < 16; kk++) { */
-/* printf("input[%d][%d][%d]: %d ", */
-/* ii, jj, kk, */
-/* input[idx_offset[ii] + jj * stride_idx[ii] + kk]); */
-/* } */
-/* printf("\n"); */
-/* } */
-/* } */
   } while(0);
 
   printf("Execution Finished!\n");

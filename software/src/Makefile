@@ -3,16 +3,16 @@ CC=riscv64-unknown-elf-gcc
 OBJECT_OPT=-fno-common -fno-builtin-printf -specs=htif_nano.specs
 BINARY_OPT=-static -specs=htif_nano.specs
 
-SRC=mempress-rocc.c
+SRC=$(wildcard *.c)
 OBJ=$(SRC:%.c=%.o)
 TARGET=$(SRC:%.c=%.riscv)
 
 all: $(TARGET)
 
-$(OBJ): $(SRC)
+%.o: %.c
 	$(CC) $(OBJECT_OPT) -o $@ $^
 
-$(TARGET): $(OBJ)
+%.riscv: %.o
 	$(CC) $(BINARY_OPT) -o $@ $^
 
 .PHONY: clean
