@@ -77,7 +77,7 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
 
 class WithMemPress extends Config ((site, here, up) => {
   case MemPressTLB => Some(TLBConfig(nSets = 4, nWays = 4, nSectors = 1, nSuperpageEntries = 1))
-  case MemPressMaxStreams => 32
+  case MemPressMaxStreams => 16
   case MemPressArbQueDepth => 8
   case MemPressMaxOutstandingReqs => 8
   case MemPressPrintfEnable => false

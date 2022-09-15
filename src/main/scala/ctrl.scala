@@ -112,8 +112,10 @@ class CtrlModule()(implicit val p: Parameters) extends Module
           rec_stream_cnt := rec_stream_cnt + 1.U
 
           val start_addr_align = (rs2_val >> 4.U) << 4.U
-          stream_type(rec_stream_cnt) := rs1_val(2, 0)
-          stride(rec_stream_cnt)      := (rs1_val >> 3.U)
+          val cur_stride = (rs1_val >> 3.U)
+          val cur_stream_type = rs1_val(2, 0)
+          stream_type(rec_stream_cnt) := cur_stream_type
+          stride(rec_stream_cnt)      := cur_stride
           start_addr(rec_stream_cnt)  := start_addr_align
 
           when (rec_stream_cnt === stream_cnt - 1.U) {
@@ -122,7 +124,7 @@ class CtrlModule()(implicit val p: Parameters) extends Module
           }
           MemPressLogger.logInfo(
             "ROCC_PARSE_STREAM_INFO: stride: %d, start_addr: 0x%x, start_addr_align: 0x%x stream_type: %d\n", 
-            rs1_val, rs2_val, start_addr_align, stream_type)
+            cur_stride, rs2_val, start_addr_align, cur_stream_type)
         }.elsewhen (funct === FUNCT_GET_CYCLE && !rocc_out_val) {
           rocc_out_val := true.B
           rocc_out_rd := io.rocc_in.bits.inst.rd
