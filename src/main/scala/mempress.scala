@@ -16,6 +16,7 @@ case object MemPressArbQueDepth extends Field[Int]
 case object MemPressTLDepth extends Field[Int]
 case object MemPressMaxOutstandingReqs extends Field[Int]
 case object MemPressPrintfEnable extends Field[Boolean](false)
+case object MemPressFiboLFSRBits extends Field[Int]
 
 class MemPress(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyRoCC(
     opcodes = opcodes, nPTWPorts = if (p(MemPressTLB).isDefined) p(MemPressMaxStreams) else 0) {
@@ -81,6 +82,7 @@ class WithMemPress extends Config ((site, here, up) => {
   case MemPressArbQueDepth => 8
   case MemPressMaxOutstandingReqs => 8
   case MemPressPrintfEnable => false
+  case MemPressFiboLFSRBits => 30
   case BuildRoCC => up(BuildRoCC) ++ Seq(
     (p: Parameters) => {
       val mempress = LazyModule.apply(new MemPress(OpcodeSet.custom2)(p))

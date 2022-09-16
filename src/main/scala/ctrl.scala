@@ -38,6 +38,7 @@ class CtrlModule()(implicit val p: Parameters) extends Module
   val FUNCT_GET_REQCNT = 4.U
 
   val max_streams = p(MemPressMaxStreams)
+  val fibo_bits = p(MemPressFiboLFSRBits)
 
   val io = IO(new CtrlModuleIO)
 
@@ -155,8 +156,10 @@ class CtrlModule()(implicit val p: Parameters) extends Module
       val data = ((1.U << 128.U) - 1.U) ^ (1.U << s_idx)
 
       when (cur_stream === rand_rd.asUInt || cur_stream === rand_wr.asUInt) {
-       // FIXME : more elegant?
-        addr := start_addr(s_idx) + FibonacciLFSR.maxPeriod(log2Ceil(max_streams)) << 4.U
+        val msb = 66.U - PriorityEncoder(Reverse(addr_range))
+        val rand_val = FibonacciLFSR.maxPeriod(log2Ceil(fibo_bits)) & (1.U << msb - 1.U)
+
+        addr := start_addr(s_idx) + rand_val
       }.elsewhen (cur_stream === stride_rd.asUInt || cur_stream === stride_wr.asUInt) {
         val nxt_addr = cur_addr(s_idx) + stride(s_idx)
         when (nxt_addr >= end_addr(s_idx)) {
@@ -169,7 +172,7 @@ class CtrlModule()(implicit val p: Parameters) extends Module
         // TODO : add burst stream implementation
         // - What is the difference btw burst vs sending requests that has consec addr?
         // - Just leave it as is for now
-        addr := start_addr(s_idx) + FibonacciLFSR.maxPeriod(log2Ceil(max_streams)) << 4.U
+        addr := start_addr(s_idx)
       }
 
       val cur_cmd = WireInit(0.U)
