@@ -33,17 +33,16 @@ enum STREAM_TYPE {
 int main() {
   printf("main() started\n");
 
-  int max_reqs = 32;
-  int stream_cnt = 8;
-  assert(stream_cnt <= MAX_STREAMS);
-
-  unsigned long cycle_cnt, req_sent;
   int ii, jj, kk;
+  unsigned long cycle_cnt, req_sent;
 
   int kB = 1024;
   int l2_kB = 2048;
   int addr_range = l2_kB * kB * 4;
-/* int addr_range = 2048; */
+
+  int stream_cnt = 1;
+  int max_reqs = addr_range / (stream_cnt * 2 * CL_BYTES);
+  assert(stream_cnt <= MAX_STREAMS);
 
   int stride_bytes[MAX_STREAMS];
   int stride_idx[MAX_STREAMS];
@@ -55,8 +54,8 @@ int main() {
   enum STREAM_TYPE stream_type[MAX_STREAMS];
   for (ii = 0; ii < MAX_STREAMS; ii++) {
       int r = ii % 2;
-      if (r == 0) stream_type[ii] = STRIDE_RD;
-      else stream_type[ii] = STRIDE_WR;
+      if (r == 0) stream_type[ii] = RAND_RD;
+      else stream_type[ii] = RAND_WR;
   }
 
   int mem_size = addr_range * stream_cnt;
