@@ -139,10 +139,12 @@ class CtrlModule()(implicit val p: Parameters) extends Module
           rocc_out_val := true.B
           rocc_out_rd := io.rocc_in.bits.inst.rd
           rocc_out_data := cycle_counter
+          cycle_counter := 0.U
         }.elsewhen (funct === FUNCT_GET_REQCNT && !rocc_out_val) {
           rocc_out_val := true.B
           rocc_out_rd := io.rocc_in.bits.inst.rd
           rocc_out_data := req_counter
+          req_counter := 0.U
         }
       }
 
@@ -158,7 +160,7 @@ class CtrlModule()(implicit val p: Parameters) extends Module
       val data = ((1.U << 128.U) - 1.U) ^ (1.U << s_idx)
 
       when (cur_stream === rand_rd.asUInt || cur_stream === rand_wr.asUInt) {
-        val msb = 66.U - PriorityEncoder(Reverse(addr_range))
+        val msb = 64.U - PriorityEncoder(Reverse(addr_range))
         addr := start_addr(s_idx) + ((rand_val << 4.U) & ((1.U << msb) - 1.U))
 
         MemPressLogger.logInfo("random_value: %d, msb: %d\n", rand_val, msb);
