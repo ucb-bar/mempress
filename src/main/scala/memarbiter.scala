@@ -11,11 +11,10 @@ import freechips.rocketchip.rocket.constants.MemoryOpConstants
 import freechips.rocketchip.config._
 
 class MemArbiterIO(val max_streams: Int)(implicit val p: Parameters) extends Bundle {
-  val req_in = Flipped(Decoupled(new L2ReqInternal))
-  val idx = Input(UInt(log2Ceil(max_streams).W))
+  val idx_w = log2Ceil(max_streams)
 
-  val req_out = Decoupled(new L2ReqInternal)
-  val chosen = Output(UInt(log2Ceil(max_streams).W))
+  val req_in = Flipped(Decoupled(Indexed(new L2ReqInternal, idx_w)))
+  val req_out = Decoupled(Indexed(new L2ReqInternal, idx_w))
 }
 
 class MemArbiter()(implicit val p: Parameters) extends Module {
@@ -26,10 +25,12 @@ class MemArbiter()(implicit val p: Parameters) extends Module {
   val que_depth = p(MemPressArbQueDepth)
   val que = Seq.fill(max_streams)(Module(new Queue(new L2ReqInternal, que_depth)))
 
+  val cur_idx = io.req_in.bits.idx
+
   io.req_in.ready := false.B
   que.zipWithIndex.foreach { case(q, idx) =>
-    q.io.enq.bits := io.req_in.bits
-    when (idx.U =/= io.idx) {
+    q.io.enq.bits := io.req_in.bits.data
+    when (idx.U =/= cur_idx) {
       q.io.enq.valid := false.B
     }.otherwise {
       q.io.enq.valid := io.req_in.valid
@@ -42,6 +43,8 @@ class MemArbiter()(implicit val p: Parameters) extends Module {
     arbiter.io.in(i) <> que(i).io.deq
   }
 
-  io.req_out <> arbiter.io.out
-  io.chosen := arbiter.io.chosen
+  arbiter.io.out.ready := io.req_out.ready
+  io.req_out.valid := arbiter.io.out.valid
+  io.req_out.bits.data <> arbiter.io.out.bits
+  io.req_out.bits.idx := arbiter.io.chosen
 }

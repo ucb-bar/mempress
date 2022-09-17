@@ -5,15 +5,29 @@ package mempress
 
 import chisel3._
 import chisel3.util._
-import chisel3.util.random.FibonacciLFSR
 import freechips.rocketchip.tile._
 import freechips.rocketchip.rocket._
 import freechips.rocketchip.rocket.constants.MemoryOpConstants
 import freechips.rocketchip.config._
 import freechips.rocketchip.util.DecoupledHelper
 
+class GlobalStreamInfo()(implicit val p: Parameters) extends Bundle {
+  val max_streams = p(MemPressMaxStreams)
+
+  val stream_cnt = UInt(log2Ceil(max_streams + 1).W)
+  val addr_range = UInt(64.W)
+  val max_reqs   = UInt(64.W)
+}
+
+class LocalStreamInfo extends Bundle {
+  val start_addr  = UInt(64.W)
+  val stride      = UInt(64.W)
+  val stream_type = UInt(3.W)
+}
+
 class CtrlModuleIO()(implicit val p: Parameters) extends Bundle {
   val max_streams = p(MemPressMaxStreams)
+  val idx_w = log2Ceil(max_streams)
 
   val rocc_in = Flipped(Decoupled(new RoCCCommand))
   val rocc_out = Decoupled(new RoCCResponse)
@@ -22,8 +36,12 @@ class CtrlModuleIO()(implicit val p: Parameters) extends Bundle {
   val dmem_status_out = Valid(new RoCCCommand)
   val sfence_out = Output(Bool())
 
-  val dmem_req = Decoupled(new L2ReqInternal)
-  val dmem_req_idx = Output(UInt(log2Ceil(max_streams).W))
+  val send_reqs = Output(Bool())
+  val sent_done = Input(Bool())
+  val req_fire  = Input(Bool())
+  val global_stream_info = Valid(new GlobalStreamInfo)
+  val local_stream_info  = Valid(Indexed(new LocalStreamInfo, idx_w))
+
   val dmem_resp = Vec(max_streams, Flipped(Decoupled(new L2RespInternal)))
 }
 
@@ -41,9 +59,6 @@ class CtrlModule()(implicit val p: Parameters) extends Module
 
   val io = IO(new CtrlModuleIO)
 
-  val fibo_bits = p(MemPressFiboLFSRBits)
-  val rand_val = FibonacciLFSR.maxPeriod(fibo_bits)
-
   val ctrl_idle :: ctrl_getinst :: ctrl_access :: ctrl_accesspend :: Nil = Enum(4)
   val ctrl_state = RegInit(ctrl_idle.asUInt)
 
@@ -58,26 +73,43 @@ class CtrlModule()(implicit val p: Parameters) extends Module
   io.rocc_out.bits.data := rocc_out_data
 
   val busy = RegInit(false.B)
+  io.rocc_in.ready := !busy
   io.busy := busy
 
   val sfence_fire = DecoupledHelper(io.rocc_in.valid,
                                     io.rocc_in.bits.inst.funct === FUNCT_SFENCE)
   io.sfence_out := sfence_fire.fire
-
   io.dmem_status_out.bits <> io.rocc_in.bits
   io.dmem_status_out.valid := io.rocc_in.fire
 
-  val stride_rd :: stride_wr :: burst_rd :: burst_wr :: rand_rd :: rand_wr :: Nil = Enum(6)
-
-  val stream_cnt     = RegInit(0.U(log2Ceil(max_streams + 1).W))   // number of streams
   val rec_stream_cnt = RegInit(0.U(log2Ceil(max_streams + 1).W))   // streams received
-  val max_reqs       = RegInit(0.U(64.W))                          // max reqs sent per stream
+
+  val global_info_val = RegInit(false.B)
+  val stream_cnt     = RegInit(0.U(log2Ceil(max_streams + 1).W))   // number of streams
   val addr_range     = RegInit(0.U(64.W))
-  val stream_type    = RegInit(VecInit(Seq.fill(max_streams)(stride_rd.asUInt)))
-  val stride         = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W)))) // bytes to skip
-  val start_addr     = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
-  val end_addr       = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
-  val cur_addr       = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
+  val max_reqs       = RegInit(0.U(64.W))                          // max reqs sent per stream
+
+  global_info_val := false.B
+  io.global_stream_info.valid := global_info_val
+  io.global_stream_info.bits.stream_cnt := stream_cnt
+  io.global_stream_info.bits.addr_range := addr_range
+  io.global_stream_info.bits.max_reqs := max_reqs
+
+  val local_info_val   = RegInit(false.B)
+  val start_addr_align = RegInit(0.U(64.W))
+  val stride           = RegInit(0.U(64.W))
+  val stream_type      = RegInit(0.U(3.W))
+  val s_idx_out        = RegInit(0.U(log2Ceil(max_streams + 1).W))
+
+  local_info_val := false.B
+  io.local_stream_info.valid := local_info_val
+  io.local_stream_info.bits.idx := s_idx_out
+  io.local_stream_info.bits.data.start_addr := start_addr_align
+  io.local_stream_info.bits.data.stride := stride
+  io.local_stream_info.bits.data.stream_type := stream_type
+
+  val send_reqs = RegInit(false.B)
+  io.send_reqs := send_reqs
 
   val dmem_resp_val_reg  = (0 until max_streams).map{ i => RegNext(io.dmem_resp(i).valid) }
   val dmem_resp_data_reg = (0 until max_streams).map{ i => RegNext(io.dmem_resp(i).bits.data) }
@@ -89,16 +121,6 @@ class CtrlModule()(implicit val p: Parameters) extends Module
   val s_rec       = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
   val s_rec_done  = RegInit(VecInit(Seq.fill(max_streams)(false.B)))
 
-  io.dmem_req_idx := s_idx
-  io.dmem_req.valid := false.B
-  io.dmem_req.bits.addr := 0.U
-  io.dmem_req.bits.cmd := M_XWR
-  io.dmem_req.bits.size := 0.U
-  io.dmem_req.bits.data := 0.U
-
-  io.rocc_in.ready := !busy
-
-
   switch (ctrl_state) {
     is (ctrl_idle.asUInt) {
       when (io.rocc_in.fire) {
@@ -107,34 +129,25 @@ class CtrlModule()(implicit val p: Parameters) extends Module
         val rs2_val = io.rocc_in.bits.rs2
 
         when (funct === FUNCT_PARSE_GLOBAL_STREAM_INFO) {
+          global_info_val := true.B
           stream_cnt := rs1_val(4, 0)
           addr_range := rs1_val >> 5.U
           max_reqs := rs2_val
-          assert(stream_cnt < max_streams.U)
 
-          MemPressLogger.logInfo(
-            "ROCC_PARSE_GLOBAL_STREAM_INFO: stream_cnt = %d, max_reqs = %d addr_range: 0x%x\n",
-            rs1_val(4, 0), rs2_val, rs1_val >> 4.U)
+          assert(stream_cnt < max_streams.U)
         } .elsewhen (funct === FUNCT_PARSE_LOCAL_STREAM_INFO) {
           rec_stream_cnt := rec_stream_cnt + 1.U
 
-          val start_addr_align = (rs2_val >> 4.U) << 4.U
-          val cur_stride = (rs1_val >> 3.U)
-          val cur_stream_type = rs1_val(2, 0)
-
-          stream_type(rec_stream_cnt) := cur_stream_type
-          stride(rec_stream_cnt)      := cur_stride
-          start_addr(rec_stream_cnt)  := start_addr_align
-          cur_addr(rec_stream_cnt)    := start_addr_align
-          end_addr(rec_stream_cnt)    := start_addr_align + addr_range
+          local_info_val := true.B
+          start_addr_align := (rs2_val >> 4.U) << 4.U
+          stride := (rs1_val >> 3.U)
+          stream_type := rs1_val(2, 0)
+          s_idx_out := rec_stream_cnt
 
           when (rec_stream_cnt === stream_cnt - 1.U) {
             busy := true.B
             ctrl_state := ctrl_access.asUInt
           }
-          MemPressLogger.logInfo(
-            "ROCC_PARSE_LOCAL_STREAM_INFO: stride: %d, start_addr: 0x%x, start_addr_align: 0x%x stream_type: %d\n", 
-            cur_stride, rs2_val, start_addr_align, cur_stream_type)
         }.elsewhen (funct === FUNCT_GET_CYCLE && !rocc_out_val) {
           rocc_out_val := true.B
           rocc_out_rd := io.rocc_in.bits.inst.rd
@@ -154,71 +167,20 @@ class CtrlModule()(implicit val p: Parameters) extends Module
     }
     is (ctrl_access.asUInt) {
       cycle_counter := cycle_counter + 1.U
-
-      val cur_stream = stream_type(s_idx)
-      val addr = WireInit(0.U(64.W))
-      val data = ((1.U << 128.U) - 1.U) ^ (1.U << s_idx)
-
-      when (cur_stream === rand_rd.asUInt || cur_stream === rand_wr.asUInt) {
-        val msb = 64.U - PriorityEncoder(Reverse(addr_range))
-        addr := start_addr(s_idx) + ((rand_val << 4.U) & ((1.U << msb) - 1.U))
-
-        MemPressLogger.logInfo("random_value: %d, msb: %d\n", rand_val, msb);
-      }.elsewhen (cur_stream === stride_rd.asUInt || cur_stream === stride_wr.asUInt) {
-        val nxt_addr = cur_addr(s_idx) + stride(s_idx)
-        when (nxt_addr >= end_addr(s_idx)) {
-          addr := start_addr(s_idx)
-        } .otherwise {
-          addr := nxt_addr
-        }
-        cur_addr(s_idx) := addr
-      }.elsewhen (cur_stream === burst_rd.asUInt || cur_stream === burst_wr.asUInt) {
-        // TODO : add burst stream implementation
-        // - What is the difference btw burst vs sending requests that has consec addr?
-        // - Just leave it as is for now
-        addr := start_addr(s_idx)
-      }
-
-      val cur_cmd = WireInit(0.U)
-      when (cur_stream === stride_rd.asUInt|| cur_stream === burst_rd.asUInt || cur_stream === rand_rd.asUInt) {
-        cur_cmd := M_XRD
-      } .otherwise {
-        cur_cmd := M_XWR
-      }
-
-      io.dmem_req.valid     := !s_sent_done(s_idx)
-      io.dmem_req.bits.addr := addr
-      io.dmem_req.bits.cmd  := cur_cmd
-      io.dmem_req.bits.size := log2Ceil(16).U
-      io.dmem_req.bits.data := data
-
-      when (io.dmem_req.fire) {
+      when (io.req_fire) {
         req_counter := req_counter + 1.U
-        MemPressLogger.logInfo("MemReq -> s_idx: %d, s_sent: %d, addr: 0x%x, data: 0x%x streamtype: %d\n",
-          s_idx, s_sent(s_idx), addr, data, cur_stream)
       }
 
-      when (s_sent_done(s_idx)) {
-        s_idx := Mux(s_idx === stream_cnt - 1.U, 0.U, s_idx + 1.U)
-      }.elsewhen (io.dmem_req.fire) {
-        s_idx := Mux(s_idx === stream_cnt - 1.U, 0.U, s_idx + 1.U)
-        s_sent(s_idx) := s_sent(s_idx) + 1.U
-        when (s_sent(s_idx) === max_reqs - 1.U) {
-          s_sent_done(s_idx) := true.B
-        }
-      }
-
+      send_reqs := true.B
       check_resp()
 
-      val sent_done = check_done(s_sent_done)
-      when (sent_done.reduce(_ && _)) {
+      when (io.sent_done) {
         ctrl_state := ctrl_accesspend.asUInt
+        send_reqs := false.B
       }
     }
     is (ctrl_accesspend.asUInt) {
       cycle_counter := cycle_counter + 1.U
-
-      io.dmem_req.valid := false.B
 
       check_resp()
 
@@ -236,17 +198,6 @@ class CtrlModule()(implicit val p: Parameters) extends Module
     }
   }
 
-  def check_done(regs : Vec[Bool]) = {
-    val done = regs.zipWithIndex.map { case(r, idx) =>
-      val x = WireInit(true.B)
-      when (idx.U < stream_cnt) {
-        x := r
-      }
-      x
-    }
-    done
-  }
-
   def check_resp() {
     for (i <- 0 until max_streams) {
       when (dmem_resp_val_reg(i)) {
@@ -259,5 +210,17 @@ class CtrlModule()(implicit val p: Parameters) extends Module
         MemPressLogger.logInfo("MemResp -> data: 0x%x\n", dmem_resp_data_reg(i))
       }
     }
+  }
+
+  // FIXME : same code in reqgen.scala
+  def check_done(regs : Vec[Bool]) = {
+    val done = regs.zipWithIndex.map { case(r, idx) =>
+      val x = WireInit(true.B)
+      when (idx.U < stream_cnt) {
+        x := r
+      }
+      x
+    }
+    done
   }
 }

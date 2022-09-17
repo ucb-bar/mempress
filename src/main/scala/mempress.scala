@@ -53,22 +53,29 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
   io.cmd.ready := ctrl.io.rocc_in.ready
   io.busy := ctrl.io.busy
 
+  val reqgen = Module(new ReqGen())
+  reqgen.io.send_reqs := ctrl.io.send_reqs
+  ctrl.io.sent_done := reqgen.io.sent_done
+  ctrl.io.req_fire := reqgen.io.req_fire
+  reqgen.io.global_stream_info <> ctrl.io.global_stream_info
+  reqgen.io.local_stream_info <> ctrl.io.local_stream_info
+
   val arb = Module(new MemArbiter)
-  arb.io.req_in <> ctrl.io.dmem_req
-  arb.io.idx := ctrl.io.dmem_req_idx
+  arb.io.req_in <> reqgen.io.req
 
   val status = RegEnable(io.cmd.bits.status, io.cmd.fire)
 
+  val chosen = arb.io.req_out.bits.idx
   arb.io.req_out.ready := false.B
   for (i <- 0 until max_streams) {
-    when (i.U === arb.io.chosen) {
+    when (i.U === chosen) {
       outer.l2helper(i).module.io.userif.req.valid := arb.io.req_out.valid
       arb.io.req_out.ready := outer.l2helper(i).module.io.userif.req.ready
     }.otherwise {
       outer.l2helper(i).module.io.userif.req.valid := false.B
     }
     ctrl.io.dmem_resp(i) <> outer.l2helper(i).module.io.userif.resp
-    outer.l2helper(i).module.io.userif.req.bits := arb.io.req_out.bits
+    outer.l2helper(i).module.io.userif.req.bits := arb.io.req_out.bits.data
     outer.l2helper(i).module.io.sfence <> ctrl.io.sfence_out
     outer.l2helper(i).module.io.status.valid := ctrl.io.dmem_status_out.valid
     outer.l2helper(i).module.io.status.bits := ctrl.io.dmem_status_out.bits.status
