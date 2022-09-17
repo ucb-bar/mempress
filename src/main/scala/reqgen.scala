@@ -12,24 +12,19 @@ import freechips.rocketchip.rocket.constants.MemoryOpConstants
 import freechips.rocketchip.config._
 import freechips.rocketchip.util.DecoupledHelper
 
-class ReqGenIO()(implicit val p: Parameters) extends Bundle {
-  val max_streams = p(MemPressMaxStreams)
-  val idx_w = log2Ceil(max_streams)
-
+class ReqGenIO(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) extends Bundle {
   val send_reqs = Input(Bool())
   val sent_done = Output(Bool())
   val req_fire  = Output(Bool())
 
-  val global_stream_info = Flipped(Valid(new GlobalStreamInfo))
+  val global_stream_info = Flipped(Valid(new GlobalStreamInfo(max_streams)))
   val local_stream_info  = Flipped(Valid(Indexed(new LocalStreamInfo, idx_w)))
 
   val req = Decoupled(Indexed(new L2ReqInternal, idx_w))
 }
 
-class ReqGen()(implicit val p: Parameters) extends Module {
-  val max_streams = p(MemPressMaxStreams)
-
-  val io = IO(new ReqGenIO)
+class ReqGen(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) extends Module {
+  val io = IO(new ReqGenIO(max_streams, idx_w))
 
   val stride_rd :: stride_wr :: burst_rd :: burst_wr :: rand_rd :: rand_wr :: Nil = Enum(6)
   val fibo_bits = p(MemPressFiboLFSRBits)

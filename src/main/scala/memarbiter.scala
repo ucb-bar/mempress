@@ -10,17 +10,13 @@ import freechips.rocketchip.rocket._
 import freechips.rocketchip.rocket.constants.MemoryOpConstants
 import freechips.rocketchip.config._
 
-class MemArbiterIO(val max_streams: Int)(implicit val p: Parameters) extends Bundle {
-  val idx_w = log2Ceil(max_streams)
-
+class MemArbiterIO(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) extends Bundle {
   val req_in = Flipped(Decoupled(Indexed(new L2ReqInternal, idx_w)))
   val req_out = Decoupled(Indexed(new L2ReqInternal, idx_w))
 }
 
-class MemArbiter()(implicit val p: Parameters) extends Module {
-  val max_streams = p(MemPressMaxStreams)
-
-  val io = IO(new MemArbiterIO(max_streams))
+class MemArbiter(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) extends Module {
+  val io = IO(new MemArbiterIO(max_streams, idx_w))
 
   val que_depth = p(MemPressArbQueDepth)
   val que = Seq.fill(max_streams)(Module(new Queue(new L2ReqInternal, que_depth)))

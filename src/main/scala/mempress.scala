@@ -39,6 +39,7 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
   chisel3.dontTouch(io)
 
   val max_streams = p(MemPressMaxStreams)
+  val idx_w = log2Ceil(max_streams)
 
   // tie up some wires
   io.mem.req.valid := false.B
@@ -47,20 +48,20 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
   io.mem.keep_clock_enabled := true.B
   io.interrupt := false.B
 
-  val ctrl = Module(new CtrlModule())
+  val ctrl = Module(new CtrlModule(max_streams, idx_w))
   ctrl.io.rocc_in <> io.cmd
   io.resp <> ctrl.io.rocc_out
   io.cmd.ready := ctrl.io.rocc_in.ready
   io.busy := ctrl.io.busy
 
-  val reqgen = Module(new ReqGen())
+  val reqgen = Module(new ReqGen(max_streams, idx_w))
   reqgen.io.send_reqs := ctrl.io.send_reqs
   ctrl.io.sent_done := reqgen.io.sent_done
   ctrl.io.req_fire := reqgen.io.req_fire
   reqgen.io.global_stream_info <> ctrl.io.global_stream_info
   reqgen.io.local_stream_info <> ctrl.io.local_stream_info
 
-  val arb = Module(new MemArbiter)
+  val arb = Module(new MemArbiter(max_streams, idx_w))
   arb.io.req_in <> reqgen.io.req
 
   val status = RegEnable(io.cmd.bits.status, io.cmd.fire)

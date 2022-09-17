@@ -11,9 +11,7 @@ import freechips.rocketchip.rocket.constants.MemoryOpConstants
 import freechips.rocketchip.config._
 import freechips.rocketchip.util.DecoupledHelper
 
-class GlobalStreamInfo()(implicit val p: Parameters) extends Bundle {
-  val max_streams = p(MemPressMaxStreams)
-
+class GlobalStreamInfo(val max_streams: Int)(implicit val p: Parameters) extends Bundle {
   val stream_cnt = UInt(log2Ceil(max_streams + 1).W)
   val addr_range = UInt(64.W)
   val max_reqs   = UInt(64.W)
@@ -25,10 +23,7 @@ class LocalStreamInfo extends Bundle {
   val stream_type = UInt(3.W)
 }
 
-class CtrlModuleIO()(implicit val p: Parameters) extends Bundle {
-  val max_streams = p(MemPressMaxStreams)
-  val idx_w = log2Ceil(max_streams)
-
+class CtrlModuleIO(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) extends Bundle {
   val rocc_in = Flipped(Decoupled(new RoCCCommand))
   val rocc_out = Decoupled(new RoCCResponse)
   val busy = Output(Bool())
@@ -39,25 +34,23 @@ class CtrlModuleIO()(implicit val p: Parameters) extends Bundle {
   val send_reqs = Output(Bool())
   val sent_done = Input(Bool())
   val req_fire  = Input(Bool())
-  val global_stream_info = Valid(new GlobalStreamInfo)
+  val global_stream_info = Valid(new GlobalStreamInfo(max_streams))
   val local_stream_info  = Valid(Indexed(new LocalStreamInfo, idx_w))
 
   val dmem_resp = Vec(max_streams, Flipped(Decoupled(new L2RespInternal)))
 }
 
-class CtrlModule()(implicit val p: Parameters) extends Module
-    with HasCoreParameters 
-    with MemoryOpConstants {
-
+class CtrlModule(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) 
+  extends Module
+  with HasCoreParameters 
+  with MemoryOpConstants {
   val FUNCT_SFENCE = 0.U
   val FUNCT_PARSE_GLOBAL_STREAM_INFO = 1.U
   val FUNCT_PARSE_LOCAL_STREAM_INFO = 2.U
   val FUNCT_GET_CYCLE = 3.U
   val FUNCT_GET_REQCNT = 4.U
 
-  val max_streams = p(MemPressMaxStreams)
-
-  val io = IO(new CtrlModuleIO)
+  val io = IO(new CtrlModuleIO(max_streams, idx_w))
 
   val ctrl_idle :: ctrl_getinst :: ctrl_access :: ctrl_accesspend :: Nil = Enum(4)
   val ctrl_state = RegInit(ctrl_idle.asUInt)
