@@ -23,7 +23,8 @@ class LocalStreamInfo extends Bundle {
   val stream_type = UInt(3.W)
 }
 
-class CtrlModuleIO(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) extends Bundle {
+class CtrlModuleIO(val max_streams: Int, val idx_w: Int, val l2helper_cnt: Int)
+                  (implicit val p: Parameters) extends Bundle {
   val rocc_in = Flipped(Decoupled(new RoCCCommand))
   val rocc_out = Decoupled(new RoCCResponse)
   val busy = Output(Bool())
@@ -37,20 +38,23 @@ class CtrlModuleIO(val max_streams: Int, val idx_w: Int)(implicit val p: Paramet
   val global_stream_info = Valid(new GlobalStreamInfo(max_streams))
   val local_stream_info  = Valid(Indexed(new LocalStreamInfo, idx_w))
 
-  val dmem_resp = Vec(max_streams, Flipped(Decoupled(new L2RespInternal)))
+  val dmem_resp = Vec(l2helper_cnt, Flipped(Decoupled(new L2RespInternal)))
 }
 
-class CtrlModule(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) 
-  extends Module
-  with HasCoreParameters 
-  with MemoryOpConstants {
+class CtrlModule(val max_streams: Int, val idx_w: Int, val single_l2tl: Boolean)
+    (implicit val p: Parameters) 
+    extends Module
+    with HasCoreParameters 
+    with MemoryOpConstants {
   val FUNCT_SFENCE = 0.U
   val FUNCT_PARSE_GLOBAL_STREAM_INFO = 1.U
   val FUNCT_PARSE_LOCAL_STREAM_INFO = 2.U
   val FUNCT_GET_CYCLE = 3.U
   val FUNCT_GET_REQCNT = 4.U
 
-  val io = IO(new CtrlModuleIO(max_streams, idx_w))
+  val l2helper_cnt = if (single_l2tl) 1 else max_streams
+
+  val io = IO(new CtrlModuleIO(max_streams, idx_w, l2helper_cnt))
 
   val ctrl_idle :: ctrl_getinst :: ctrl_access :: ctrl_accesspend :: Nil = Enum(4)
   val ctrl_state = RegInit(ctrl_idle.asUInt)
@@ -104,15 +108,13 @@ class CtrlModule(val max_streams: Int, val idx_w: Int)(implicit val p: Parameter
   val send_reqs = RegInit(false.B)
   io.send_reqs := send_reqs
 
-  val dmem_resp_val_reg  = (0 until max_streams).map{ i => RegNext(io.dmem_resp(i).valid) }
-  val dmem_resp_data_reg = (0 until max_streams).map{ i => RegNext(io.dmem_resp(i).bits.data) }
+  val dmem_resp_val_reg  = (0 until l2helper_cnt).map{ i => RegNext(io.dmem_resp(i).valid) }
+  val dmem_resp_data_reg = (0 until l2helper_cnt).map{ i => RegNext(io.dmem_resp(i).bits.data) }
   io.dmem_resp.foreach(_.ready := true.B)
 
-  val s_idx       = RegInit(0.U(log2Ceil(max_streams + 1).W))
-  val s_sent      = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
-  val s_sent_done = RegInit(VecInit(Seq.fill(max_streams)(false.B)))
-  val s_rec       = RegInit(VecInit(Seq.fill(max_streams)(0.U(64.W))))
-  val s_rec_done  = RegInit(VecInit(Seq.fill(max_streams)(false.B)))
+  val s_rec      = RegInit(VecInit(Seq.fill(l2helper_cnt)(0.U(64.W))))
+  val s_rec_done = RegInit(VecInit(Seq.fill(l2helper_cnt)(false.B)))
+  val s_idx      = RegInit(0.U(log2Ceil(max_streams + 1).W))
 
   switch (ctrl_state) {
     is (ctrl_idle.asUInt) {
@@ -176,44 +178,53 @@ class CtrlModule(val max_streams: Int, val idx_w: Int)(implicit val p: Parameter
       cycle_counter := cycle_counter + 1.U
 
       check_resp()
-
-      val rec_done = check_done(s_rec_done)
-      when (rec_done.reduce(_ && _)) {
-        busy := false.B
-        ctrl_state := ctrl_idle.asUInt
-
-        s_idx := 0.U
-        s_sent.foreach(_ := 0.U)
-        s_sent_done.foreach(_ := false.B)
-        s_rec.foreach(_ := 0.B)
-        s_rec_done.foreach(_ := false.B)
-      }
+      check_done()
     }
   }
 
   def check_resp() {
-    for (i <- 0 until max_streams) {
+    for (i <- 0 until l2helper_cnt) {
       when (dmem_resp_val_reg(i)) {
         val idx = i.U
         s_rec(idx) := s_rec(idx) + 1.U
 
-        when (s_rec(idx) === max_reqs - 1.U) {
-          s_rec_done(idx) := true.B
+        if (single_l2tl) {
+          when (s_rec(idx) === max_reqs * stream_cnt - 1.U) {
+            s_rec_done(idx) := true.B
+          }
+        } else {
+          when (s_rec(idx) === max_reqs - 1.U) {
+            s_rec_done(idx) := true.B
+          }
         }
         MemPressLogger.logInfo("MemResp -> data: 0x%x\n", dmem_resp_data_reg(i))
       }
     }
   }
 
-  // FIXME : same code in reqgen.scala
-  def check_done(regs : Vec[Bool]) = {
-    val done = regs.zipWithIndex.map { case(r, idx) =>
+  def check_done() {
+    val rec_done = s_rec_done.zipWithIndex.map { case(r, idx) =>
       val x = WireInit(true.B)
-      when (idx.U < stream_cnt) {
-        x := r
+
+      if (single_l2tl) {
+        when (idx.U === 0.U) {
+          x := r
+        }
+      } else {
+        when (idx.U < stream_cnt) {
+          x := r
+        }
       }
       x
     }
-    done
+
+    when (rec_done.reduce(_ && _)) {
+      busy := false.B
+      ctrl_state := ctrl_idle.asUInt
+
+      s_idx := 0.U
+      s_rec.foreach(_ := 0.B)
+      s_rec_done.foreach(_ := false.B)
+    }
   }
 }
