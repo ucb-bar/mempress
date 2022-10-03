@@ -35,12 +35,38 @@ int main() {
 
   int ii, jj, kk;
   unsigned long cycle_cnt, req_sent;
-
   int kB = 1024;
-  int l2_kB = 2048;
-  int addr_range = l2_kB * kB * 4;
 
+#ifdef _2MiBL2
+  int l2_kB = 2048;
+#endif // 2MiBL2
+#ifdef _4MiBL2
+  int l2_kB = 4096;
+#endif // 4MiBL2
+#ifdef _8MiBL2
+  int l2_kB = 8192;
+#endif // 8MiBL2
+#ifdef _16MiBL2
+  int l2_kB = 16384;
+#endif // 16MiBL2
+
+#ifdef _1stream
   int stream_cnt = 1;
+#endif // _1stream
+#ifdef _2stream
+  int stream_cnt = 2;
+#endif // _2stream
+#ifdef _4stream
+  int stream_cnt = 4;
+#endif // _4stream
+#ifdef _8stream
+  int stream_cnt = 8;
+#endif // _8stream
+#ifdef _16stream
+  int stream_cnt = 16;
+#endif // _16stream
+
+  int addr_range = l2_kB * kB * 4;
   int max_reqs = addr_range / (stream_cnt * 2 * CL_BYTES);
   assert(stream_cnt <= MAX_STREAMS);
 
