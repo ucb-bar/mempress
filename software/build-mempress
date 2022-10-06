@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+CURR_DIR=$(pwd)
+MARSHAL_CONFIG_DIR=/home/centos/hyperscale-soc-chipyard/generators/mempress/software
+FIREMARSHAL_DIR=/home/centos/hyperscale-soc-chipyard/software/firemarshal
+
+cd $FIREMARSHAL_DIR
+./marshal clean ${MARSHAL_CONFIG_DIR}/mempress-bare-2-1.yaml
+
+./marshal build ${MARSHAL_CONFIG_DIR}/mempress-bare-2-1.yaml 
+
+./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-2-1.yaml
+
+cd $CURR_DIR
