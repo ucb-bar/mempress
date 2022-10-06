@@ -268,11 +268,11 @@ class L2MemHelperModule(outer: L2MemHelper, printInfo: String = "", queueRequest
         dmem.d.bits.data,
         global_memop_ackd,
         dmem.d.bits.source)
-      } .otherwise {
-        MemPressLogger.logInfo(printInfo + " L2IF: resp(write) opnum: %d, gettag: %d\n",
-          global_memop_ackd,
-          dmem.d.bits.source)
-      }
+    } .otherwise {
+      MemPressLogger.logInfo(printInfo + " L2IF: resp(write) opnum: %d, gettag: %d\n",
+        global_memop_ackd,
+        dmem.d.bits.source)
+    }
   }
 
   when (response_output.fire()) {

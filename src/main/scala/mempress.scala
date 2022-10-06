@@ -31,7 +31,7 @@ class MemPress(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyRoCC(
   val l2helper_cnt = if (single_l2tl) 1 else max_streams
 
   val l2helper = (0 until l2helper_cnt).map{ x =>
-                  val y = LazyModule(new L2MemHelper(s"stream[${x}]", 
+                  val y = LazyModule(new L2MemHelper(s"stream[${x}]",
                                      numOutstandingReqs=max_outstand_reqs, 
                                      queueResponses=true, 
                                      queueRequests=true)) 
@@ -102,7 +102,7 @@ class WithMemPressMaxReq1 extends Config ((site, here, up) => {
   case MemPressMaxStreams => 16
   case MemPressArbQueDepth => 8
   case MemPressMaxOutstandingReqs => 1
-  case MemPressPrintfEnable => false
+  case MemPressPrintfEnable => true
   case MemPressFiboLFSRBits => 30
   case MemPressSingleL2TL => true
   case BuildRoCC => up(BuildRoCC) ++ Seq(

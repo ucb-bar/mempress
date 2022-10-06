@@ -119,9 +119,12 @@ class ReqGen(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) e
     io.req.bits.data.data := data
     io.req.bits.idx := s_idx
 
+    val s_sent_wire = WireInit(0.U(64.W))
+    val cur_stream_wire = WireInit(stride_rd.asUInt)
     when (io.req.fire) {
-      MemPressLogger.logInfo("MemReq -> s_idx: %d, s_sent: %d, addr: 0x%x, data: 0x%x streamtype: %d\n",
-        s_idx, s_sent(s_idx), addr, data, cur_stream)
+      s_sent_wire := s_sent(s_idx)
+      cur_stream_wire := cur_stream
+      MemPressLogger.logInfo(s"MemReq -> s_idx: %d, s_sent: %d, addr: 0x%x, data: 0x%x, streamtype: %d\n", s_idx, s_sent_wire, addr, data, cur_stream_wire)
     }
 
     when (s_sent_done(s_idx)) {
