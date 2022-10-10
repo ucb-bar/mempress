@@ -1,0 +1,11 @@
+#!/usr/bin/bash
+FIRESIM_CONFIGS=/home/centos/hyperscale-soc-chipyard/generators/mempress/software/firesim-configs
+FIRESIM_DEPLOY=/home/centos/hyperscale-soc-chipyard/sims/firesim/deploy
+
+
+# Rocket sims
+cp ${FIRESIM_CONFIGS}/mempress-2MiBL2_1stream_rocket_config_runtime.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim launchrunfarm
+firesim infrasetup
+firesim runworkload
+firesim terminaterunfarm --forceterminate
