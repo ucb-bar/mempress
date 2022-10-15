@@ -37,10 +37,10 @@ int main() {
   unsigned long cycle_cnt, req_sent;
 
   int kB = 1024;
-  int l2_kB = 2048;
+  int l2_kB = 2; // Set L2 size as 2kB for CI tests
   int addr_range = l2_kB * kB * 4;
 
-  int stream_cnt = 1;
+  int stream_cnt = 2;
   int max_reqs = addr_range / (stream_cnt * 2 * CL_BYTES);
   assert(stream_cnt <= MAX_STREAMS);
 
