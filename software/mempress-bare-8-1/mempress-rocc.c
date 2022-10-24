@@ -80,8 +80,8 @@ int main() {
   enum STREAM_TYPE stream_type[MAX_STREAMS];
   for (ii = 0; ii < MAX_STREAMS; ii++) {
       int r = ii % 2;
-      if (r == 0) stream_type[ii] = RAND_RD;
-      else stream_type[ii] = RAND_WR;
+      if (r == 0) stream_type[ii] = STRIDE_RD;
+      else stream_type[ii] = STRIDE_WR;
   }
 
   int mem_size = addr_range * stream_cnt;
@@ -132,13 +132,13 @@ int main() {
     asm volatile ("fence" ::: "memory");
 
     assert(cycle_cnt != 0);
-    int bytes_sent = req_sent * 16;
-    int nano_sec = cycle_cnt / 2; // assuming 2.0 GHz .... float support missing?
-    int bw_MBps = (bytes_sent * 1000) / nano_sec;
+    unsigned long bytes_sent = req_sent * 16;
+    unsigned long nano_sec = cycle_cnt / 2; // assuming 2.0 GHz .... float support missing?
+    unsigned long bw_MBps = (bytes_sent * 1000) / nano_sec;
 
     printf("cycle_cnt value: %lu\n", cycle_cnt);
     printf("req_sent value: %lu\n", req_sent);
-    printf("Achieved BW of the system: %d MB/s\n", bw_MBps);
+    printf("Achieved BW of the system: %lu MB/s\n", bw_MBps);
   } while(0);
 
   printf("Execution Finished!\n");
