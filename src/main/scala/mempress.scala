@@ -97,12 +97,60 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
   }
 }
 
+class WithMemPress extends Config ((site, here, up) => {
+  case MemPressTLB => Some(TLBConfig(nSets = 4, nWays = 4, nSectors = 1, nSuperpageEntries = 1))
+  case MemPressMaxStreams => 16
+  case MemPressArbQueDepth => 8
+  case MemPressMaxOutstandingReqs => 8
+  case MemPressPrintfEnable => false
+  case MemPressFiboLFSRBits => 30
+  case MemPressSingleL2TL => true
+  case BuildRoCC => up(BuildRoCC) ++ Seq(
+    (p: Parameters) => {
+      val mempress = LazyModule.apply(new MemPress(OpcodeSet.custom2)(p))
+      mempress
+    }
+  )
+})
+
 class WithMemPressMaxReq1 extends Config ((site, here, up) => {
   case MemPressTLB => Some(TLBConfig(nSets = 4, nWays = 4, nSectors = 1, nSuperpageEntries = 1))
   case MemPressMaxStreams => 16
   case MemPressArbQueDepth => 8
   case MemPressMaxOutstandingReqs => 1
-  case MemPressPrintfEnable => true
+  case MemPressPrintfEnable => false
+  case MemPressFiboLFSRBits => 30
+  case MemPressSingleL2TL => true
+  case BuildRoCC => up(BuildRoCC) ++ Seq(
+    (p: Parameters) => {
+      val mempress = LazyModule.apply(new MemPress(OpcodeSet.custom2)(p))
+      mempress
+    }
+  )
+})
+
+class WithMemPressMaxReq40 extends Config ((site, here, up) => {
+  case MemPressTLB => Some(TLBConfig(nSets = 4, nWays = 4, nSectors = 1, nSuperpageEntries = 1))
+  case MemPressMaxStreams => 16
+  case MemPressArbQueDepth => 8
+  case MemPressMaxOutstandingReqs => 40
+  case MemPressPrintfEnable => false
+  case MemPressFiboLFSRBits => 30
+  case MemPressSingleL2TL => true
+  case BuildRoCC => up(BuildRoCC) ++ Seq(
+    (p: Parameters) => {
+      val mempress = LazyModule.apply(new MemPress(OpcodeSet.custom2)(p))
+      mempress
+    }
+  )
+})
+
+class WithMemPressMaxReq42 extends Config ((site, here, up) => {
+  case MemPressTLB => Some(TLBConfig(nSets = 4, nWays = 4, nSectors = 1, nSuperpageEntries = 1))
+  case MemPressMaxStreams => 16
+  case MemPressArbQueDepth => 8
+  case MemPressMaxOutstandingReqs => 42
+  case MemPressPrintfEnable => false
   case MemPressFiboLFSRBits => 30
   case MemPressSingleL2TL => true
   case BuildRoCC => up(BuildRoCC) ++ Seq(

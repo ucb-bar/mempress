@@ -1,7 +1,8 @@
-#!/usr/bin/bash
+#!/bin/bash
 CURR_DIR=$(pwd)
-MARSHAL_CONFIG_DIR=/home/centos/hyperscale-soc-chipyard/generators/mempress/software
-FIREMARSHAL_DIR=/home/centos/hyperscale-soc-chipyard/software/firemarshal
+MARSHAL_CONFIG_DIR=/scratch/edwinlim/hyperscale-soc-chipyard/generators/mempress/software
+FIREMARSHAL_DIR=/scratch/edwinlim/hyperscale-soc-chipyard/software/firemarshal
+WORKLOAD_DIR=/scratch/edwinlim/hyperscale-soc-chipyard/sims/firesim/deploy/workloads
 
 cd $FIREMARSHAL_DIR
 
@@ -19,5 +20,10 @@ cd $FIREMARSHAL_DIR
 ./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-4-1.yaml
 ./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-8-1.yaml
 ./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-16-1.yaml
+
+sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-2-1.json
+sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-4-1.json
+sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-8-1.json
+sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-16-1.json
 
 cd $CURR_DIR
