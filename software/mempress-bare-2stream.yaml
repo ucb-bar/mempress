@@ -1,0 +1,6 @@
+{
+  "name" : "mempress-bare-2stream",
+  "base" : "bare-base.json",
+  "host-init" : "build.sh",
+  "bin" : "mempress-rocc-2stream.riscv",
+}

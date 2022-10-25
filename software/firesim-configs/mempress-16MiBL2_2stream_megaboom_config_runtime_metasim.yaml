@@ -77,7 +77,7 @@ autocounter:
 
 workload:
     #workload_name: snappy-silesia-baremetal.json
-    workload_name: mempress-bare-1stream.json 
+    workload_name: mempress-bare-2stream.json 
     terminate_on_completion: no
     suffix_tag: null
 
