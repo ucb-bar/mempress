@@ -6,24 +6,20 @@ WORKLOAD_DIR=/scratch/edwinlim/hyperscale-soc-chipyard/sims/firesim/deploy/workl
 
 cd $FIREMARSHAL_DIR
 
-./marshal clean ${MARSHAL_CONFIG_DIR}/mempress-bare-2-1.yaml
-./marshal clean ${MARSHAL_CONFIG_DIR}/mempress-bare-4-1.yaml
-./marshal clean ${MARSHAL_CONFIG_DIR}/mempress-bare-8-1.yaml
-./marshal clean ${MARSHAL_CONFIG_DIR}/mempress-bare-16-1.yaml
+./marshal clean ${MARSHAL_CONFIG_DIR}/mempress-bare-1stream.yaml
+./marshal clean ${MARSHAL_CONFIG_DIR}/mempress-bare-2stream.yaml
+./marshal clean ${MARSHAL_CONFIG_DIR}/mempress-bare-4stream.yaml
 
-./marshal build ${MARSHAL_CONFIG_DIR}/mempress-bare-2-1.yaml
-./marshal build ${MARSHAL_CONFIG_DIR}/mempress-bare-4-1.yaml
-./marshal build ${MARSHAL_CONFIG_DIR}/mempress-bare-8-1.yaml
-./marshal build ${MARSHAL_CONFIG_DIR}/mempress-bare-16-1.yaml
+./marshal build ${MARSHAL_CONFIG_DIR}/mempress-bare-1stream.yaml
+./marshal build ${MARSHAL_CONFIG_DIR}/mempress-bare-2stream.yaml
+./marshal build ${MARSHAL_CONFIG_DIR}/mempress-bare-4stream.yaml
 
-./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-2-1.yaml
-./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-4-1.yaml
-./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-8-1.yaml
-./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-16-1.yaml
+./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-1stream.yaml
+./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-2stream.yaml
+./marshal install ${MARSHAL_CONFIG_DIR}/mempress-bare-4stream.yaml
 
-sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-2-1.json
-sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-4-1.json
-sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-8-1.json
-sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-16-1.json
+sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-1stream.json
+sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-2stream.json
+sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/mempress-bare-4stream.json
 
 cd $CURR_DIR
