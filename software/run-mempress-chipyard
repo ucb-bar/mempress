@@ -1,39 +1,86 @@
 #!/bin/bash
-FIRESIM_CONFIGS=/scratch/edwinlim/chipyard-metasim/generators/mempress/software/firesim-configs
+FIRESIM_CONFIGS=/scratch/edwinlim/chipyard-metasim/generators/mempress/software/firesim-configs-chipyard
 FIRESIM_DEPLOY=/scratch/edwinlim/chipyard-metasim/sims/firesim/deploy
 
 # Rocket sims
 cp ${FIRESIM_CONFIGS}/mempress-2MiBL2_1stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
 firesim infrasetup
 firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-2MiBL2_2stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-2MiBL2_4stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
 
 cp ${FIRESIM_CONFIGS}/mempress-4MiBL2_1stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-4MiBL2_2stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-4MiBL2_4stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
 firesim infrasetup
 firesim runworkload
 
 cp ${FIRESIM_CONFIGS}/mempress-8MiBL2_1stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
 firesim infrasetup
 firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-8MiBL2_2stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-8MiBL2_4stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
 
 cp ${FIRESIM_CONFIGS}/mempress-16MiBL2_1stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
 firesim infrasetup
 firesim runworkload
-
+cp ${FIRESIM_CONFIGS}/mempress-16MiBL2_2stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-16MiBL2_4stream_rocket_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
 
 # MegaBoom sims
 cp ${FIRESIM_CONFIGS}/mempress-2MiBL2_1stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-2MiBL2_2stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-2MiBL2_4stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
 firesim infrasetup
 firesim runworkload
 
 cp ${FIRESIM_CONFIGS}/mempress-4MiBL2_1stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
 firesim infrasetup
 firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-4MiBL2_2stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-4MiBL2_4stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
 
 cp ${FIRESIM_CONFIGS}/mempress-8MiBL2_1stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
 firesim infrasetup
 firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-8MiBL2_2stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-8MiBL2_4stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
 
 cp ${FIRESIM_CONFIGS}/mempress-16MiBL2_1stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-16MiBL2_2stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/mempress-16MiBL2_4stream_megaboom_config_runtime_metasim.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
 firesim infrasetup
 firesim runworkload
 
