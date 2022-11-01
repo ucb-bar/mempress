@@ -37,8 +37,8 @@ int main() {
   unsigned long cycle_cnt, req_sent;
   int kB = 1024;
 
-// hardcoded to largest l2 size for accurate comparison between configs
-int l2_kB = 16384;
+  // hardcoded to largest l2 size for accurate comparison between configs
+  int l2_kB = 16384;
 
 #ifdef _1stream
   int stream_cnt = 1;
