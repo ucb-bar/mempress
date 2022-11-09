@@ -1,0 +1,6 @@
+{
+  "name" : "FASED-testing",
+  "base" : "bare-base.json",
+  "host-init" : "build.sh",
+  "bin" : "mem-stride.riscv",
+}

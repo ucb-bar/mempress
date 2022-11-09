@@ -1,0 +1,17 @@
+#!/bin/bash
+CURR_DIR=$(pwd)
+MARSHAL_CONFIG_DIR=/scratch/edwinlim/hyperscale-soc-chipyard/generators/mempress/software
+FIREMARSHAL_DIR=/scratch/edwinlim/hyperscale-soc-chipyard/software/firemarshal
+WORKLOAD_DIR=/scratch/edwinlim/hyperscale-soc-chipyard/sims/firesim/deploy/workloads
+
+cd $FIREMARSHAL_DIR
+
+./marshal clean ${MARSHAL_CONFIG_DIR}/FASED-testing.yaml
+
+./marshal build ${MARSHAL_CONFIG_DIR}/FASED-testing.yaml
+
+./marshal install ${MARSHAL_CONFIG_DIR}/FASED-testing.yaml
+
+sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out", "metasim_waveform.vpd"/g' ${WORKLOAD_DIR}/FASED-testing.json
+
+cd $CURR_DIR

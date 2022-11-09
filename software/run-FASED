@@ -1,0 +1,44 @@
+#!/bin/bash
+FIRESIM_CONFIGS=/scratch/edwinlim/hyperscale-soc-chipyard/generators/mempress/software/firesim-configs-FASED
+FIRESIM_DEPLOY=/scratch/edwinlim/hyperscale-soc-chipyard/sims/firesim/deploy
+
+# Rocket sims
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_4MBLLC_hyperscale_rocket_1stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_4MBLLC_hyperscale_rocket_2stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_4MBLLC_hyperscale_rocket_4stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_8MBLLC_hyperscale_rocket_1stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_8MBLLC_hyperscale_rocket_2stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_8MBLLC_hyperscale_rocket_4stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_16MBLLC_hyperscale_rocket_1stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_16MBLLC_hyperscale_rocket_2stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_16MBLLC_hyperscale_rocket_4stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_32MBLLC_hyperscale_rocket_1stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_32MBLLC_hyperscale_rocket_2stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
+cp ${FIRESIM_CONFIGS}/FASED_512KBL2_32MBLLC_hyperscale_rocket_4stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+firesim infrasetup
+firesim runworkload
