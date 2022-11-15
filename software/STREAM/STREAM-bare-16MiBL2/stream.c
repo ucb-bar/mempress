@@ -432,7 +432,7 @@ double mysecond()
 
         unsigned long curr_cycle;
         __asm__ __volatile__ ("rdcycle %0" : "=r" (curr_cycle));
-        return (double) (curr_cycle / _2GHz);
+        return (double) ((double) curr_cycle / (double) _2GHz);
 }
 
 #ifndef abs
