@@ -1,0 +1,17 @@
+#!/bin/bash
+CURR_DIR=$(pwd)
+MARSHAL_CONFIG_DIR=/scratch/edwinlim/hyperscale-soc-chipyard/generators/mempress/software/STREAM
+FIREMARSHAL_DIR=/scratch/edwinlim/hyperscale-soc-chipyard/software/firemarshal
+WORKLOAD_DIR=/scratch/edwinlim/hyperscale-soc-chipyard/sims/firesim/deploy/workloads
+
+cd $FIREMARSHAL_DIR
+
+./marshal clean ${MARSHAL_CONFIG_DIR}/STREAM-bare-16MiBL2.yaml
+
+./marshal build ${MARSHAL_CONFIG_DIR}/STREAM-bare-16MiBL2.yaml
+
+./marshal install ${MARSHAL_CONFIG_DIR}/STREAM-bare-16MiBL2.yaml
+
+sed -i 's/"uartlog"/"uartlog", "metasim_stderr.out"/g' ${WORKLOAD_DIR}/STREAM-bare-16MiBL2.json
+
+cd $CURR_DIR

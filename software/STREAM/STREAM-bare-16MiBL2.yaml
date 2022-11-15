@@ -1,0 +1,6 @@
+{
+  "name" : "STREAM-bare-16MiBL2",
+  "base" : "bare-base.json",
+  "host-init" : "build.sh",
+  "bin" : "stream.riscv",
+}
