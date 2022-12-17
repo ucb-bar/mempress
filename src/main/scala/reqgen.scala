@@ -86,9 +86,9 @@ class ReqGen(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) e
     val data = ((1.U << 128.U) - 1.U) ^ (1.U << s_idx)
 
     when (cur_stream === rand_rd.asUInt || cur_stream === rand_wr.asUInt) {
-      val msb = 64.U - PriorityEncoder(Reverse(addr_range))
+      val msb = 63.U - PriorityEncoder(Reverse(addr_range))
       addr := start_addr(s_idx) + ((rand_val << 4.U) & ((1.U << msb) - 1.U))
-    }.elsewhen (cur_stream === stride_rd.asUInt || cur_stream === stride_wr.asUInt) {
+    } .elsewhen (cur_stream === stride_rd.asUInt || cur_stream === stride_wr.asUInt) {
       val nxt_addr = cur_addr(s_idx) + stride(s_idx)
       when (nxt_addr >= end_addr(s_idx)) {
         addr := start_addr(s_idx)
