@@ -15,10 +15,10 @@ class MemArbiterIO(val max_streams: Int, val idx_w: Int)(implicit val p: Paramet
   val req_out = Decoupled(Indexed(new L2ReqInternal, idx_w))
 }
 
-class MemArbiter(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) extends Module {
+class MemArbiter(val max_streams: Int, val idx_w: Int, que_depth: Int)
+(implicit val p: Parameters) extends Module {
   val io = IO(new MemArbiterIO(max_streams, idx_w))
 
-  val que_depth = p(MemPressArbQueDepth)
   val que = Seq.fill(max_streams)(Module(new Queue(new L2ReqInternal, que_depth)))
 
   val cur_idx = io.req_in.bits.idx

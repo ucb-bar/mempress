@@ -23,12 +23,12 @@ class ReqGenIO(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters)
   val req = Decoupled(Indexed(new L2ReqInternal, idx_w))
 }
 
-class ReqGen(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) extends Module {
+class ReqGen(val max_streams: Int, val idx_w: Int, val fibolfsr_bits: Int)
+(implicit val p: Parameters) extends Module {
   val io = IO(new ReqGenIO(max_streams, idx_w))
 
   val stride_rd :: stride_wr :: burst_rd :: burst_wr :: rand_rd :: rand_wr :: Nil = Enum(6)
-  val fibo_bits = p(MemPressFiboLFSRBits)
-  val rand_val = FibonacciLFSR.maxPeriod(fibo_bits)
+  val rand_val = FibonacciLFSR.maxPeriod(fibolfsr_bits)
 
   val stream_cnt     = RegInit(0.U(log2Ceil(max_streams + 1).W))
   val addr_range     = RegInit(0.U(64.W))
