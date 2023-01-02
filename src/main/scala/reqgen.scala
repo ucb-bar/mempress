@@ -83,7 +83,7 @@ class ReqGen(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) e
   when (io.send_reqs) {
     val cur_stream = stream_type(s_idx)
     val addr = WireInit(0.U(64.W))
-    val data = ((1.U << 128.U) - 1.U) ^ (1.U << s_idx)
+    val data = ((1.U << 256.U) - 1.U) ^ (1.U << s_idx)
 
     when (cur_stream === rand_rd.asUInt || cur_stream === rand_wr.asUInt) {
       val msb = 64.U - PriorityEncoder(Reverse(addr_range))

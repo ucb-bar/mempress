@@ -9,10 +9,10 @@ cp ${FIRESIM_CONFIGS}/FASED_512KBL2_4MBLLC_hyperscale_rocket_mempress1stream.yam
 firesim infrasetup
 firesim runworkload
 
-cp ${FIRESIM_CONFIGS}/FASED_512KBL2_4MBLLC_hyperscale_rocket_mempress2stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
-firesim infrasetup
-firesim runworkload
+#cp ${FIRESIM_CONFIGS}/FASED_512KBL2_4MBLLC_hyperscale_rocket_mempress2stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+#firesim infrasetup
+#firesim runworkload
 
-cp ${FIRESIM_CONFIGS}/FASED_512KBL2_4MBLLC_hyperscale_rocket_mempress4stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
-firesim infrasetup
-firesim runworkload
+#cp ${FIRESIM_CONFIGS}/FASED_512KBL2_4MBLLC_hyperscale_rocket_mempress4stream.yaml ${FIRESIM_DEPLOY}/config_runtime.yaml
+#firesim infrasetup
+#firesim runworkload

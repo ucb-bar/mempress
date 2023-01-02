@@ -17,11 +17,11 @@ class L2ReqInternal extends Bundle {
   val addr = UInt()
   val cmd = UInt()
   val size = UInt()
-  val data = UInt(width=128)
+  val data = UInt(width=256)
 }
 
 class L2RespInternal extends Bundle {
-  val data = UInt(width=128)
+  val data = UInt(width=256)
 }
 
 class L2InternalTracking extends Bundle {

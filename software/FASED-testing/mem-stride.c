@@ -9,7 +9,7 @@
 
 int main() {
   // array size is 4 x L2 size for HyperscaleMegaBoomFASEDTestConfig
-  size_t l2_kB = 512;
+  size_t l2_kB = 64;
   size_t kB = 1024;
   size_t mem_size = l2_kB * kB * 4;
   size_t stride = 64;
