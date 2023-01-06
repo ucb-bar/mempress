@@ -35,7 +35,7 @@ class MemPress(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyRoCC(
                                      numOutstandingReqs=max_outstand_reqs, 
                                      queueResponses=true, 
                                      queueRequests=true)) 
-                  tlNode := y.masterNode
+                  tlNode := TLWidthWidget(16) := y.masterNode
                   y
                 }
 }
