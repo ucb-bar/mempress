@@ -9,7 +9,7 @@ import chisel3.util.random.FibonacciLFSR
 import freechips.rocketchip.tile._
 import freechips.rocketchip.rocket._
 import freechips.rocketchip.rocket.constants.MemoryOpConstants
-import freechips.rocketchip.config._
+import org.chipsalliance.cde.config._
 import freechips.rocketchip.util.DecoupledHelper
 
 class ReqGenIO(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) extends Bundle {
