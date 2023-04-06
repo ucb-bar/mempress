@@ -8,7 +8,7 @@ import chisel3.util._
 import freechips.rocketchip.tile._
 import freechips.rocketchip.rocket._
 import freechips.rocketchip.rocket.constants.MemoryOpConstants
-import freechips.rocketchip.config._
+import org.chipsalliance.cde.config._
 
 class MemArbiterIO(val max_streams: Int, val idx_w: Int)(implicit val p: Parameters) extends Bundle {
   val req_in = Flipped(Decoupled(Indexed(new L2ReqInternal, idx_w)))
