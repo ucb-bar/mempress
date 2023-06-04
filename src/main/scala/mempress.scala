@@ -98,14 +98,14 @@ class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModul
   }
 }
 
-class WithMemPress extends Config ((site, here, up) => {
+class WithMemPress(singleL2: Boolean = true, maxStreams: Int = 16) extends Config ((site, here, up) => {
   case MemPressTLB => Some(TLBConfig(nSets = 4, nWays = 4, nSectors = 1, nSuperpageEntries = 1))
-  case MemPressMaxStreams => 16
+  case MemPressMaxStreams => maxStreams
   case MemPressArbQueDepth => 8
   case MemPressMaxOutstandingReqs => 8
   case MemPressPrintfEnable => false
   case MemPressFiboLFSRBits => 30
-  case MemPressSingleL2TL => true
+  case MemPressSingleL2TL => singleL2
   case BuildRoCC => up(BuildRoCC) ++ Seq(
     (p: Parameters) => {
       val mempress = LazyModule.apply(new MemPress(OpcodeSet.custom2)(p))
