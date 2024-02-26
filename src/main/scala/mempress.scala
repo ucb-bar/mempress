@@ -32,17 +32,17 @@ class MemPress(opcodes: OpcodeSet)(implicit p: Parameters) extends LazyRoCC(
   val l2helper_cnt = if (single_l2tl) 1 else max_streams
 
   val l2helper = (0 until l2helper_cnt).map{ x =>
-                  val y = LazyModule(new L2MemHelper(s"stream[${x}]", 
-                                     numOutstandingReqs=max_outstand_reqs, 
-                                     queueResponses=true, 
-                                     queueRequests=true)) 
+                  val y = LazyModule(new L2MemHelper(s"stream[${x}]",
+                                     numOutstandingReqs=max_outstand_reqs,
+                                     queueResponses=true,
+                                     queueRequests=true))
                   tlNode := TLWidthWidget(16) := y.masterNode
                   y
                 }
 }
 
 class MemPressImp(outer: MemPress)(implicit p: Parameters) extends LazyRoCCModuleImp(outer) {
-  chisel3.dontTouch(io)
+  //chisel3.dontTouch(io)
 
   val max_streams = p(MemPressMaxStreams)
   val idx_w = log2Ceil(max_streams)
