@@ -91,6 +91,8 @@ class L2MemHelperModule(outer: L2MemHelper, printInfo: String = "", queueRequest
   tlb.io.req.bits.size := request_input.bits.size
   tlb.io.req.bits.cmd := request_input.bits.cmd
   tlb.io.req.bits.passthrough := false.B
+  tlb.io.req.bits.prv := status.dprv
+  tlb.io.req.bits.v := status.dv
   val tlb_ready = tlb.io.req.ready && !tlb.io.resp.miss
 
   io.ptw <> tlb.io.ptw
@@ -100,6 +102,8 @@ class L2MemHelperModule(outer: L2MemHelper, printInfo: String = "", queueRequest
   tlb.io.sfence.bits.rs2 := false.B
   tlb.io.sfence.bits.addr := 0.U
   tlb.io.sfence.bits.asid := 0.U
+  tlb.io.sfence.bits.hv := false.B
+  tlb.io.sfence.bits.hg := false.B
   tlb.io.kill := false.B
 
 
@@ -108,6 +112,7 @@ class L2MemHelperModule(outer: L2MemHelper, printInfo: String = "", queueRequest
 
   val tags_for_issue_Q = Module(new Queue(UInt(outer.tlTagBits.W), outer.numOutstandingRequestsAllowed * 2))
   tags_for_issue_Q.io.enq.valid := false.B
+  tags_for_issue_Q.io.enq.bits := DontCare
 
   val tags_init_reg = RegInit(0.U((outer.tlTagBits+1).W))
   when (tags_init_reg =/= (outer.numOutstandingRequestsAllowed).U) {
